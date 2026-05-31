@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.next/
+.env
+.env.local
+uploads/
+backend/.pgdata/
+backend/.pgpass-init
+*.log
+frontend/build-*.txt
+frontend/install-output.txt
+frontend/npm-next-install-log.txt
+.DS_Store

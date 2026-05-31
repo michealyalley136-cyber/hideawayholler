@@ -29,7 +29,25 @@ export async function api<T>(
   });
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.error || data.message || 'Request failed');
+  if (!res.ok) {
+    const message = data.error || data.message || 'Request failed';
+
+    if (typeof window !== 'undefined') {
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.assign('/login');
+        return new Promise<T>(() => {});
+      }
+
+      if (res.status === 403) {
+        window.location.assign('/portal');
+        return new Promise<T>(() => {});
+      }
+    }
+
+    throw new ApiError(res.status, message);
+  }
   return data as T;
 }
 

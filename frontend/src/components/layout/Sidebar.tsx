@@ -24,7 +24,7 @@ import {
 import { UserRole } from '@/lib/types';
 
 const residentNav = [
-  { href: '/dashboard', label: 'Resident Home', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/apply', label: 'Apply', icon: ClipboardList },
   { href: '/leases', label: 'Leases', icon: FileText },
@@ -39,10 +39,10 @@ const residentNav = [
 ];
 
 const adminNav = [
-  { href: '/admin', label: 'Hideaway Holler Admin', icon: LayoutDashboard },
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/residents', label: 'Residents', icon: Users },
   { href: '/admin/seasons', label: 'Seasons', icon: Calendar },
-  { href: '/admin/housing', label: 'Rooms & Beds', icon: Building2 },
+  { href: '/admin/housing', label: 'Housing', icon: Building2 },
   { href: '/admin/applications', label: 'Applications', icon: ClipboardList },
   { href: '/admin/leases', label: 'Leases', icon: FileText },
   { href: '/admin/payments', label: 'Payments', icon: CreditCard },
@@ -54,7 +54,7 @@ const adminNav = [
 ];
 
 const alumniNav = [
-  { href: '/alumni', label: 'Alumni Home', icon: LayoutDashboard },
+  { href: '/alumni', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/alumni/history', label: 'History', icon: FileText },
   { href: '/apply', label: 'Reapply', icon: ClipboardList },
   { href: '/emergency', label: 'Emergency', icon: AlertTriangle },
@@ -71,8 +71,8 @@ export function Sidebar({ role, onNavigate }: { role: UserRole; onNavigate?: () 
           <Home className="w-5 h-5 text-white" />
         </div>
         <div>
-          <p className="font-semibold text-slate-900 text-sm">Hideaway Holler</p>
-          <p className="text-xs text-slate-500">Resident Portal</p>
+          <p className="font-semibold text-slate-900 text-sm">HollerHub</p>
+          <p className="text-xs text-slate-500">Hideaway Holler</p>
         </div>
       </Link>
       {nav.map((item) => {

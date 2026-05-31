@@ -14,9 +14,9 @@ export default function TermsPage() {
         <h1 className="mt-2 text-4xl font-bold">Hideaway Holler Terms</h1>
         <div className="mt-6 space-y-5 text-base leading-8 text-stone-700">
           <p>
-            The Hideaway Holler Resident Portal supports housing applications, leases, payment status,
-            notices, maintenance requests, check-in/check-out details, and resident communication.
-            Portal access is intended for applicants, residents, alumni, and authorized staff.
+            HollerHub is provided to support housing applications and resident communication for
+            Hideaway Holler. Portal access is intended for applicants, residents, alumni, and authorized
+            staff.
           </p>
           <p>
             Housing details, lease obligations, payment terms, and community rules are governed by the

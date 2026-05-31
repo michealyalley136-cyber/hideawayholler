@@ -12,7 +12,7 @@ export function MarketingNav() {
           </span>
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold text-stone-950">Hideaway Holler</span>
-            <span className="block truncate text-xs text-stone-600">Student Housing Portal</span>
+            <span className="block truncate text-xs text-stone-600">Cultural Exchange Community</span>
           </span>
         </Link>
 
@@ -36,7 +36,7 @@ export function MarketingNav() {
             className="inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-800 transition hover:bg-stone-50"
           >
             <LogIn className="h-4 w-4" />
-            Resident Portal
+            Portal
           </Link>
         </div>
       </div>

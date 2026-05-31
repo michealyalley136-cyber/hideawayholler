@@ -35,8 +35,8 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
       <Card className="w-full max-w-md">
         <CardBody>
-          <h1 className="text-2xl font-bold text-slate-900">Apply for Hideaway Holler housing</h1>
-          <p className="text-sm text-slate-500 mt-1">Create your resident portal account for J1 cultural exchange housing</p>
+          <h1 className="text-2xl font-bold text-slate-900">Apply for housing</h1>
+          <p className="text-sm text-slate-500 mt-1">Create your HollerHub applicant account</p>
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Input label="Full name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required />
             <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />

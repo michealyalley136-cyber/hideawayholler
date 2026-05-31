@@ -31,8 +31,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
       <Card className="w-full max-w-md">
         <CardBody>
-          <h1 className="text-2xl font-bold text-slate-900">Hideaway Holler Resident Portal</h1>
-          <p className="text-sm text-slate-500 mt-1">Sign in to manage your housing, notices, payments, and maintenance requests</p>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
+          <p className="text-sm text-slate-500 mt-1">Sign in to your HollerHub account</p>
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />

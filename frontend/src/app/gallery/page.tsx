@@ -86,8 +86,7 @@ export default function PublicGalleryPage() {
             </p>
             <h2 className="mt-5 max-w-3xl text-3xl font-bold sm:text-4xl">Ready to start your housing application?</h2>
             <p className="mt-3 max-w-2xl text-stone-300">
-              Create your Hideaway Holler applicant account, choose an available season, and follow your
-              approval steps through the resident portal.
+              Create your applicant account, choose an available season, and follow your approval steps through the resident portal.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link href="/apply" className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 px-5 py-3 text-sm font-semibold text-stone-950 hover:bg-amber-400">

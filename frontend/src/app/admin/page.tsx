@@ -31,18 +31,18 @@ export default function AdminDashboard() {
       <AppShell>
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Hideaway Holler Admin</h1>
-            <p className="text-slate-600 mt-1">Seasonal resident management for the J1 housing community</p>
+            <h1 className="text-2xl font-bold text-slate-900">Admin dashboard</h1>
+            <p className="text-slate-600 mt-1">Hideaway Holler operations overview</p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            <StatCard title="Residents" value={stats?.totalResidents ?? '—'} icon={Users} />
+            <StatCard title="Total residents" value={stats?.totalResidents ?? '—'} icon={Users} />
             <StatCard title="Active residents" value={stats?.activeResidents ?? '—'} icon={UserCheck} accent="text-emerald-600 bg-emerald-50" />
-            <StatCard title="Applications" value={stats?.newApplications ?? '—'} icon={ClipboardList} accent="text-blue-600 bg-blue-50" />
+            <StatCard title="New applications" value={stats?.newApplications ?? '—'} icon={ClipboardList} accent="text-blue-600 bg-blue-50" />
             <StatCard title="Vacant beds" value={stats?.vacantBeds ?? '—'} icon={Bed} />
             <StatCard title="Occupied beds" value={stats?.occupiedBeds ?? '—'} icon={BedDouble} />
-            <StatCard title="Maintenance" value={stats?.openMaintenance ?? '—'} icon={Wrench} accent="text-amber-600 bg-amber-50" />
-            <StatCard title="Payments due" value={stats?.rentDue ?? '—'} icon={CreditCard} />
+            <StatCard title="Open maintenance" value={stats?.openMaintenance ?? '—'} icon={Wrench} accent="text-amber-600 bg-amber-50" />
+            <StatCard title="Rent due" value={stats?.rentDue ?? '—'} icon={CreditCard} />
             <StatCard title="Overdue payments" value={stats?.overduePayments ?? '—'} icon={AlertCircle} accent="text-red-600 bg-red-50" />
             <StatCard title="Arrivals this week" value={stats?.arrivalsThisWeek ?? '—'} icon={PlaneLanding} />
             <StatCard title="Departures this week" value={stats?.departuresThisWeek ?? '—'} icon={PlaneTakeoff} />

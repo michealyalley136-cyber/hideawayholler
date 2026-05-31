@@ -1,6 +1,6 @@
-# Hideaway Holler Resident Portal
+# HollerHub
 
-Custom resident portal for **Hideaway Holler** - J1 student housing and seasonal resident management in Sevierville, Tennessee.
+Production-ready resident portal for **Hideaway Holler** — J1 student boarding and resident management in Sevierville, Tennessee.
 
 ## Stack
 
@@ -13,10 +13,6 @@ Custom resident portal for **Hideaway Holler** - J1 student housing and seasonal
 | Files | Local uploads (dev); structured for S3 later |
 
 **No Stripe** — payments are tracked manually by admins.
-
-## Internal positioning note
-
-Future opportunity: This architecture could later be adapted into a general onboarding/resident management platform for other housing operators, but the current product is custom-built for Hideaway Holler.
 
 ## Features
 

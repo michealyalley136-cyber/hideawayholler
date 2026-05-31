@@ -52,7 +52,7 @@ export const navLinks = [
 export const loveCards = [
   {
     title: 'Safe Community',
-    text: 'Individual access codes and thoughtful monitoring help residents feel supported from arrival to checkout.',
+    text: 'Individual access codes and monitored shared areas help residents feel supported from arrival to checkout.',
     icon: ShieldCheck,
     tone: 'bg-emerald-50 text-emerald-800',
   },
@@ -70,7 +70,7 @@ export const loveCards = [
   },
   {
     title: 'Close to Work Areas',
-    text: 'A convenient home base for Cultural Exchange Programs in Pigeon Forge, Gatlinburg, and Sevierville.',
+    text: 'A convenient home base for J1 cultural exchange work in Pigeon Forge, Gatlinburg, and Sevierville.',
     icon: MapPin,
     tone: 'bg-rose-50 text-rose-800',
   },
@@ -82,7 +82,7 @@ export const loveCards = [
   },
   {
     title: 'On-Site Management',
-    text: '24/7 property management keeps day-to-day questions and urgent needs close to home.',
+    text: '24/7 on-site property management keeps day-to-day questions and urgent needs close to home.',
     icon: Headphones,
     tone: 'bg-violet-50 text-violet-800',
   },
@@ -214,4 +214,13 @@ export const howItWorks = [
   'Receive Room Assignment',
   'Check In',
   'Enjoy Your Stay',
+];
+
+export const portalPreviewItems = [
+  'Lease documents',
+  'Payment status',
+  'Community notices',
+  'Maintenance requests',
+  'Local guide',
+  'Check-in and check-out',
 ];

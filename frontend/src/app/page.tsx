@@ -9,6 +9,7 @@ import {
   howItWorks,
   loveCards,
   outdoorAmenities,
+  portalPreviewItems,
   propertyHighlights,
   safetyItems,
 } from '@/lib/hideawayMarketing';
@@ -137,7 +138,8 @@ export default function LandingPage() {
             <ShieldCheck className="h-10 w-10 text-amber-200" />
             <h2 className="mt-5 text-3xl font-bold">Safety & Support</h2>
             <p className="mt-3 leading-7 text-emerald-50">
-              Residents have practical support and clear information from move-in through checkout.
+              Residents have practical support, monitored common spaces, and clear emergency information
+              from move-in through checkout.
             </p>
             <div className="mt-6 grid gap-3">
               {safetyItems.map((item) => (
@@ -200,6 +202,10 @@ export default function LandingPage() {
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase text-emerald-800">How It Works</p>
             <h2 className="mt-2 text-3xl font-bold text-stone-950 sm:text-4xl">From application to check-in.</h2>
+            <p className="mt-4 max-w-3xl text-lg leading-8 text-stone-700">
+              The Hideaway Holler resident portal keeps each step organized for students and seasonal
+              residents, from the housing application through lease signing, room assignment, and arrival.
+            </p>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {howItWorks.map((step, index) => (
@@ -210,8 +216,8 @@ export default function LandingPage() {
                 <h3 className="mt-4 text-lg font-semibold text-stone-950">{step}</h3>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
                   {index === 0
-                    ? 'Start with your online applicant account and season interest.'
-                    : 'Track the next milestone through the resident portal as your housing journey moves forward.'}
+                    ? 'Start with your Hideaway Holler housing application and season interest.'
+                    : 'Track the next milestone through the student housing portal as your stay moves forward.'}
                 </p>
               </div>
             ))}
@@ -225,8 +231,8 @@ export default function LandingPage() {
               <h2 className="mt-2 text-3xl font-bold text-stone-950 sm:text-4xl">Already accepted or living here?</h2>
               <p className="mt-4 max-w-3xl text-lg leading-8 text-stone-700">
                 Already accepted or currently living at Hideaway Holler? Use the resident portal to view
-                your lease, notices, payment status, maintenance requests, local guide, and
-                check-in/check-out information.
+                your lease, payment status, notices, maintenance requests, local guide, room and check-in
+                details, and check-out information.
               </p>
               <Link
                 href="/portal"
@@ -237,7 +243,7 @@ export default function LandingPage() {
               </Link>
             </div>
             <div className="grid gap-3 rounded-lg bg-white p-5 shadow-sm">
-              {['Lease status', 'Notices', 'Payment status', 'Maintenance requests', 'Local guide', 'Check-in and check-out'].map((item) => (
+              {portalPreviewItems.map((item) => (
                 <div key={item} className="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3">
                   <CheckCircle2 className="h-5 w-5 text-emerald-700" />
                   <span className="text-sm font-semibold text-stone-800">{item}</span>

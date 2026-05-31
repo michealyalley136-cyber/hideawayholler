@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import '@/styles/globals.css';
 
 export const metadata: Metadata = {
-  title: 'Hideaway Holler | Cultural Exchange Community',
-  description: 'Resort-style cultural exchange housing for J1 students, interns, and seasonal workers in the Smoky Mountain area.',
+  title: 'Hideaway Holler | J1 Cultural Exchange Housing',
+  description: 'Hideaway Holler resident portal and cultural exchange housing community for J1 students, interns, and seasonal workers in Pigeon Forge and Sevierville.',
   icons: {
     icon: '/favicon.svg',
   },

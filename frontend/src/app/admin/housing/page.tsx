@@ -18,7 +18,7 @@ export default function AdminHousingPage() {
   return (
     <ProtectedRoute roles={['ADMIN']}>
       <AppShell>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Housing</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">Rooms & Beds</h1>
         {occupancy && (
           <p className="text-slate-600 mb-6">
             {occupancy.occupied} occupied · {occupancy.vacant} vacant · {occupancy.totalBeds} total beds

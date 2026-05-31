@@ -19,8 +19,9 @@ export default function PrivacyPolicyPage() {
             and related resident services.
           </p>
           <p>
-            Information submitted through HollerHub is used for housing operations and resident support.
-            For privacy questions, contact Hideawayhollerpf@gmail.com.
+            Information submitted through the Hideaway Holler Resident Portal is used for housing
+            operations and resident support. For privacy questions, contact
+            Hideawayhollerpf@gmail.com.
           </p>
         </div>
       </main>

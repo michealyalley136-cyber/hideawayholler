@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { UserRole } from '@prisma/client';
 import { verifyToken, JwtPayload } from '../utils/jwt';
 
-export interface AuthRequest extends Request {
+export interface AuthRequest extends Request<Record<string, string>> {
   user?: JwtPayload;
 }
 

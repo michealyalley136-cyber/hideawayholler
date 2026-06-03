@@ -37,12 +37,12 @@ export default function CheckOutPage() {
             <CardBody>
               <form onSubmit={submit} className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Move-out notes</label>
-                  <textarea className="mt-1 w-full border rounded-lg px-3 py-2 text-sm min-h-[80px]" value={form.moveOutNotes} onChange={(e) => setForm({ ...form, moveOutNotes: e.target.value })} />
+                  <label className="text-sm font-medium text-slate-700">Move-out notes</label>
+                  <textarea className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm min-h-[80px]" value={form.moveOutNotes} onChange={(e) => setForm({ ...form, moveOutNotes: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Damage report (if any)</label>
-                  <textarea className="mt-1 w-full border rounded-lg px-3 py-2 text-sm min-h-[80px]" value={form.damageReport} onChange={(e) => setForm({ ...form, damageReport: e.target.value })} />
+                  <label className="text-sm font-medium text-slate-700">Damage report (if any)</label>
+                  <textarea className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm min-h-[80px]" value={form.damageReport} onChange={(e) => setForm({ ...form, damageReport: e.target.value })} />
                 </div>
                 <Button type="submit" loading={loading}>Submit check-out</Button>
               </form>

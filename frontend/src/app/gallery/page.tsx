@@ -3,7 +3,7 @@ import { ArrowRight, Camera, MapPin } from 'lucide-react';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
 import { MarketingImage } from '@/components/marketing/MarketingImage';
 import { MarketingNav } from '@/components/marketing/MarketingNav';
-import { galleryImages, propertyHighlights } from '@/lib/hideawayMarketing';
+import { cottageGalleryImages, galleryImages, propertyHighlights } from '@/lib/hideawayMarketing';
 
 export const metadata = {
   title: 'Gallery | Hideaway Holler',
@@ -43,6 +43,30 @@ export default function PublicGalleryPage() {
                 wrapperClassName={index === 0 ? 'aspect-[16/10] rounded-lg md:col-span-2 md:row-span-2' : 'aspect-[16/11] rounded-lg'}
               />
             ))}
+          </div>
+        </section>
+
+        <section className="bg-[#fff7e8] py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="max-w-3xl">
+              <p className="text-sm font-semibold uppercase text-amber-700">The Cottage</p>
+              <h2 className="mt-2 text-3xl font-bold text-stone-950">Warm cabin living with quiet corners.</h2>
+              <p className="mt-3 text-base leading-7 text-stone-700">
+                A closer look at The Cottage interior, porch, bedrooms, bathrooms, stream, and gathering spaces.
+              </p>
+            </div>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {cottageGalleryImages.map((image, index) => (
+                <MarketingImage
+                  key={image.localPath || image.src}
+                  src={image.src}
+                  fallbackSrc={image.fallbackSrc}
+                  gradient={image.gradient}
+                  alt={image.alt}
+                  wrapperClassName={index === 0 ? 'aspect-[16/10] rounded-lg sm:col-span-2' : 'aspect-[4/3] rounded-lg'}
+                />
+              ))}
+            </div>
           </div>
         </section>
 

@@ -56,8 +56,8 @@ export default function CheckInPage() {
                   <span className="text-sm">I accept community rules</span>
                 </label>
                 <div>
-                  <label className="text-sm font-medium">Room condition notes</label>
-                  <textarea className="mt-1 w-full border rounded-lg px-3 py-2 text-sm min-h-[80px]" value={form.roomCondition} onChange={(e) => setForm({ ...form, roomCondition: e.target.value })} />
+                  <label className="text-sm font-medium text-slate-700">Room condition notes</label>
+                  <textarea className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm min-h-[80px]" value={form.roomCondition} onChange={(e) => setForm({ ...form, roomCondition: e.target.value })} />
                 </div>
                 <Button type="submit" loading={loading}>Submit check-in</Button>
               </form>

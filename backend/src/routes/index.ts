@@ -17,6 +17,10 @@ import emergencyRoutes from './emergency.routes';
 
 const router = Router();
 
+router.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'hollerhub-api' });
+});
+
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/seasons', seasonRoutes);

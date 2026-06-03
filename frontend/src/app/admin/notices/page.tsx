@@ -34,10 +34,10 @@ export default function AdminNoticesPage() {
             <form onSubmit={create} className="space-y-3">
               <Input label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
               <div>
-                <label className="text-sm font-medium">Content</label>
-                <textarea className="mt-1 w-full border rounded-lg px-3 py-2 text-sm min-h-[80px]" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} required />
+                <label className="text-sm font-medium text-slate-700">Content</label>
+                <textarea className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm min-h-[80px]" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} required />
               </div>
-              <select className="border rounded-lg px-3 py-2 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              <select className="border border-slate-300 rounded-lg px-3 py-2 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                 {['RULES', 'COMMUNITY', 'RENT_REMINDER', 'WEATHER', 'EMERGENCY', 'EVENT'].map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <Button type="submit">Publish</Button>

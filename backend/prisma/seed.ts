@@ -8,7 +8,26 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@hideawayholler.com' },
-    update: {},
+    update: {
+      passwordHash,
+      role: UserRole.ADMIN,
+      profile: {
+        upsert: {
+          create: {
+            fullName: 'Holler Admin',
+            phone: '+1-865-555-0100',
+            country: 'USA',
+            currentStatus: ResidentStatus.ACTIVE_RESIDENT,
+          },
+          update: {
+            fullName: 'Holler Admin',
+            phone: '+1-865-555-0100',
+            country: 'USA',
+            currentStatus: ResidentStatus.ACTIVE_RESIDENT,
+          },
+        },
+      },
+    },
     create: {
       email: 'admin@hideawayholler.com',
       passwordHash,

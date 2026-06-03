@@ -7,6 +7,11 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 
+const demoAccounts = [
+  { label: 'Admin', email: 'admin@hideawayholler.com', password: 'password123' },
+  { label: 'Resident', email: 'maria@example.com', password: 'password123' },
+];
+
 export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -27,12 +32,35 @@ export default function LoginPage() {
     }
   };
 
+  const fillDemoAccount = (account: (typeof demoAccounts)[number]) => {
+    setEmail(account.email);
+    setPassword(account.password);
+    setError('');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
       <Card className="w-full max-w-md">
         <CardBody>
           <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
           <p className="text-sm text-slate-500 mt-1">Sign in to your HollerHub account</p>
+          <div className="mt-5 grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Demo logins</p>
+            {demoAccounts.map((account) => (
+              <button
+                key={account.email}
+                type="button"
+                onClick={() => fillDemoAccount(account)}
+                className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-brand-300 hover:bg-brand-50"
+              >
+                <span>
+                  <span className="block font-semibold text-slate-800">{account.label}</span>
+                  <span className="block text-xs text-slate-500">{account.email}</span>
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-brand-700">Use</span>
+              </button>
+            ))}
+          </div>
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
@@ -48,7 +76,7 @@ export default function LoginPage() {
             </Link>
           </p>
           <p className="mt-2 text-xs text-center text-slate-400">
-            Demo: maria@example.com / password123
+            Admin: admin@hideawayholler.com / password123
           </p>
         </CardBody>
       </Card>

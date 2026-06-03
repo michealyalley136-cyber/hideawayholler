@@ -89,6 +89,27 @@ enum ApplicationStatus {
   WITHDRAWN
 }
 
+enum SupplyType {
+  TOILET_PAPER
+  PAPER_TOWELS
+  TRASH_BAGS
+  CLEANING_SUPPLIES
+  DISH_SOAP
+  LAUNDRY_SUPPLIES
+  OTHER
+}
+
+enum SupplyRequestStatus {
+  OPEN
+  FULFILLED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -108,6 +129,8 @@ model User {
   checkOuts          CheckOut[]
   roomAssignments    RoomAssignment[]
   uploadedDocuments  Document[]
+  supplyRequests     SupplyRequest[]
+  residentReviews    ResidentReview[]
 }
 
 model Season {
@@ -360,6 +383,40 @@ model MaintenanceRequest {
   mediaPaths  String[]
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SupplyRequest {
+  id          String              @id @default(uuid())
+  userId      String
+  house       String
+  supplyType  SupplyType
+  quantity    Int                 @default(1)
+  notes       String?
+  status      SupplyRequestStatus @default(OPEN)
+  fulfilledAt DateTime?
+  fulfilledBy String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ResidentReview {
+  id          String       @id @default(uuid())
+  userId      String
+  rating      Int
+  title       String
+  review      String
+  photoPath   String?
+  photoFileName String?
+  status      ReviewStatus @default(PENDING)
+  isFeatured  Boolean      @default(false)
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

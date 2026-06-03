@@ -2,10 +2,13 @@ import { Response } from 'express';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 
+const ANIMAL_HOUSES = ['Bear House', 'Deer House', 'Elk House', 'Fox House'];
+
 export async function listProperties(_req: AuthRequest, res: Response) {
   const properties = await prisma.property.findMany({
     include: {
       buildings: {
+        where: { name: { in: ANIMAL_HOUSES } },
         include: {
           rooms: {
             include: {
@@ -98,7 +101,7 @@ export async function assignRoom(req: AuthRequest, res: Response) {
 }
 
 export async function getOccupancy(_req: AuthRequest, res: Response) {
-  const beds = await prisma.bed.count({ where: { isActive: true } });
-  const occupied = await prisma.roomAssignment.count({ where: { vacatedAt: null } });
+  const beds = await prisma.bed.count({ where: { isActive: true, room: { building: { name: { in: ANIMAL_HOUSES } } } } });
+  const occupied = await prisma.roomAssignment.count({ where: { vacatedAt: null, room: { building: { name: { in: ANIMAL_HOUSES } } } } });
   res.json({ totalBeds: beds, occupied, vacant: beds - occupied });
 }

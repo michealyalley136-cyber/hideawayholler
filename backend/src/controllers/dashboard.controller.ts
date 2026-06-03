@@ -1,8 +1,10 @@
 import { Response } from 'express';
-import { PaymentStatus, MaintenanceStatus, ResidentStatus } from '@prisma/client';
+import { PaymentStatus, MaintenanceStatus, ResidentStatus, SupplyRequestStatus, ReviewStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { getJourneySteps } from '../utils/residentJourney';
+
+const ANIMAL_HOUSES = ['Bear House', 'Deer House', 'Elk House', 'Fox House'];
 
 export async function adminDashboard(req: AuthRequest, res: Response) {
   const now = new Date();
@@ -22,12 +24,14 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
     overduePayments,
     arrivalsThisWeek,
     departuresThisWeek,
+    openSupplyRequests,
+    pendingReviews,
   ] = await Promise.all([
     prisma.user.count({ where: { role: { in: ['RESIDENT', 'ALUMNI'] } } }),
     prisma.seasonResident.count({ where: { status: ResidentStatus.ACTIVE_RESIDENT } }),
     prisma.application.count({ where: { status: 'PENDING' } }),
-    prisma.bed.count({ where: { isActive: true } }),
-    prisma.roomAssignment.count({ where: { vacatedAt: null } }),
+    prisma.bed.count({ where: { isActive: true, room: { building: { name: { in: ANIMAL_HOUSES } } } } }),
+    prisma.roomAssignment.count({ where: { vacatedAt: null, room: { building: { name: { in: ANIMAL_HOUSES } } } } }),
     prisma.maintenanceRequest.count({ where: { status: { in: [MaintenanceStatus.OPEN, MaintenanceStatus.ASSIGNED, MaintenanceStatus.IN_PROGRESS] } } }),
     prisma.payment.count({ where: { status: PaymentStatus.DUE } }),
     prisma.payment.count({ where: { status: PaymentStatus.OVERDUE } }),
@@ -37,9 +41,13 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
     prisma.residentProfile.count({
       where: { departureDate: { gte: weekStart, lte: weekEnd } },
     }),
+    prisma.supplyRequest.count({ where: { status: SupplyRequestStatus.OPEN } }),
+    prisma.residentReview.count({ where: { status: ReviewStatus.PENDING } }),
   ]);
 
   const vacantBeds = Math.max(0, beds - occupiedAssignments);
+  const houseOccupancy = `${occupiedAssignments}/${beds}`;
+  const weatherAlerts = 0;
 
   res.json({
     stats: {
@@ -53,6 +61,10 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
       overduePayments,
       arrivalsThisWeek,
       departuresThisWeek,
+      openSupplyRequests,
+      houseOccupancy,
+      pendingReviews,
+      weatherAlerts,
     },
   });
 }

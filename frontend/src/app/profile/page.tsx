@@ -55,8 +55,8 @@ export default function ProfilePage() {
             <Input label="Emergency phone" value={form.emergencyContactPhone || ''} onChange={(e) => setForm({ ...form, emergencyContactPhone: e.target.value })} />
           </CardBody>
         </Card>
-        <div className="mt-4 flex items-center gap-4">
-          <Button onClick={save} loading={saving}>Save changes</Button>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <Button className="w-full sm:w-auto" onClick={save} loading={saving}>Save changes</Button>
           {message && <span className="text-sm text-brand-600">{message}</span>}
         </div>
         {profile && (

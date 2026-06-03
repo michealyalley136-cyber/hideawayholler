@@ -43,7 +43,7 @@ export default function AdminPaymentsPage() {
                   <span>Paid: ${Number(p.amountPaid).toFixed(2)}</span>
                   <span>Balance: ${Number(p.balance).toFixed(2)}</span>
                 </div>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 grid gap-2 sm:flex">
                   <Button size="sm" variant="outline" onClick={() => update(p.id, { amountPaid: Number(p.amountDue), status: 'PAID', receiptVerified: true })}>Mark paid</Button>
                   {p.receiptPath && !p.receiptVerified && (
                     <Button size="sm" onClick={() => update(p.id, { receiptVerified: true })}>Verify receipt</Button>

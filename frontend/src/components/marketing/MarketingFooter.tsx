@@ -5,7 +5,10 @@ export function MarketingFooter() {
     <footer id="contact" className="bg-stone-950 text-stone-100">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.2fr_1fr] lg:px-8">
         <div>
-          <h2 className="text-xl font-semibold">Hideaway Holler</h2>
+          <div className="flex items-center gap-3">
+            <img src="/hideaway-logo.png" alt="Hideaway Holler" className="h-12 w-12 rounded-full object-cover" />
+            <h2 className="text-xl font-semibold">Hideaway Holler</h2>
+          </div>
           <p className="mt-2 max-w-xl text-sm leading-6 text-stone-300">
             Pigeon Forge / Sevierville, Tennessee housing for Cultural Exchange Program participants,
             J1 students, interns, and seasonal workers.

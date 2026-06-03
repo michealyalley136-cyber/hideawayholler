@@ -18,10 +18,10 @@ export default function AdminHousingPage() {
   return (
     <ProtectedRoute roles={['ADMIN']}>
       <AppShell>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Housing</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">House Assignments</h1>
         {occupancy && (
           <p className="text-slate-600 mb-6">
-            {occupancy.occupied} occupied · {occupancy.vacant} vacant · {occupancy.totalBeds} total beds
+            House occupancy: {occupancy.occupied} occupied / {occupancy.totalBeds} total resident spaces
           </p>
         )}
         {properties.map((p) => (
@@ -29,14 +29,14 @@ export default function AdminHousingPage() {
             <CardBody>
               <h3 className="font-semibold text-lg">{p.name}</h3>
               <p className="text-sm text-slate-500">{p.address}</p>
-              {p.stats && <p className="text-sm mt-2">Capacity: {p.stats.capacity} · Occupied: {p.stats.occupied} · Vacant: {p.stats.vacant}</p>}
+              {p.stats && <p className="text-sm mt-2">House capacity: {p.stats.capacity} / Occupied: {p.stats.occupied} / Vacant: {p.stats.vacant}</p>}
               {p.buildings.map((b) => (
                 <div key={b.name} className="mt-4">
                   <h4 className="font-medium text-slate-800">{b.name}</h4>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
                     {b.rooms.map((r) => (
                       <div key={r.roomNumber} className="p-3 bg-slate-50 rounded-lg text-sm">
-                        <p className="font-medium">Room {r.roomNumber}</p>
+                        <p className="font-medium">House Assignment {r.roomNumber}</p>
                         {r.assignments.length ? (
                           r.assignments.map((a, i) => (
                             <p key={i} className="text-slate-600">{a.user?.profile?.fullName || 'Assigned'}</p>

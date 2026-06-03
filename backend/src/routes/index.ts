@@ -14,6 +14,8 @@ import localGuideRoutes from './localGuide.routes';
 import checkinRoutes from './checkin.routes';
 import checkoutRoutes from './checkout.routes';
 import emergencyRoutes from './emergency.routes';
+import supplyRoutes from './supply.routes';
+import reviewRoutes from './review.routes';
 
 const router = Router();
 
@@ -36,5 +38,7 @@ router.use('/local-guide', localGuideRoutes);
 router.use('/check-in', checkinRoutes);
 router.use('/check-out', checkoutRoutes);
 router.use('/emergency', emergencyRoutes);
+router.use('/supply-requests', supplyRoutes);
+router.use('/reviews', reviewRoutes);
 
 export default router;

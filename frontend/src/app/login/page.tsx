@@ -39,7 +39,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-3 sm:p-4">
       <Card className="w-full max-w-md">
         <CardBody>
           <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
@@ -51,7 +51,7 @@ export default function LoginPage() {
                 key={account.email}
                 type="button"
                 onClick={() => fillDemoAccount(account)}
-                className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-brand-300 hover:bg-brand-50"
+                className="flex min-h-12 items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-brand-300 hover:bg-brand-50"
               >
                 <span>
                   <span className="block font-semibold text-slate-800">{account.label}</span>

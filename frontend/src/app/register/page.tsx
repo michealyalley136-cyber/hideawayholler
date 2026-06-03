@@ -53,7 +53,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-3 sm:p-4">
       <Card className="w-full max-w-md">
         <CardBody>
           <h1 className="text-2xl font-bold text-slate-900">Apply for housing</h1>

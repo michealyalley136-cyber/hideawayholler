@@ -88,4 +88,8 @@ export interface DashboardStats {
   overduePayments: number;
   arrivalsThisWeek: number;
   departuresThisWeek: number;
+  openSupplyRequests: number;
+  houseOccupancy: string;
+  pendingReviews: number;
+  weatherAlerts: number;
 }

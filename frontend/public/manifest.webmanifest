@@ -1,0 +1,25 @@
+{
+  "name": "Hideaway Holler Resident Portal",
+  "short_name": "HollerHub",
+  "description": "Resident portal for Hideaway Holler cultural exchange housing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f2e8",
+  "theme_color": "#0f1f1c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

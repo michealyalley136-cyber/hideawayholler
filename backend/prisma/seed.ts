@@ -182,6 +182,7 @@ async function main() {
 
   const existingProperty = await prisma.property.findFirst({ where: { name: 'Hideaway Holler Main' } });
   if (existingProperty) {
+    await ensureAnimalHouses(existingProperty.id);
     console.log('Seed completed (data already exists).');
     return;
   }
@@ -228,6 +229,8 @@ async function main() {
 
   const room101 = property.buildings[0].rooms[0];
   const bedA = room101.beds[0];
+
+  await ensureAnimalHouses(property.id);
 
   await prisma.roomAssignment.create({
     data: {
@@ -372,6 +375,38 @@ async function main() {
   console.log('Resident: maria@example.com / password123');
   console.log('Applicant: juan@example.com / password123');
   console.log('Alumni: anna@example.com / password123');
+}
+
+async function ensureAnimalHouses(propertyId: string) {
+  const houses = ['Bear House', 'Deer House', 'Elk House', 'Fox House'];
+
+  for (const house of houses) {
+    let building = await prisma.building.findFirst({ where: { propertyId, name: house } });
+    if (!building) {
+      building = await prisma.building.create({
+        data: { propertyId, name: house, floors: 1 },
+      });
+    }
+
+    for (let residentSpace = 1; residentSpace <= 8; residentSpace += 1) {
+      const roomNumber = `${house.replace(' House', '')}-${residentSpace}`;
+      const existingRoom = await prisma.room.findFirst({
+        where: { buildingId: building.id, roomNumber },
+      });
+      if (!existingRoom) {
+        await prisma.room.create({
+          data: {
+            buildingId: building.id,
+            roomNumber,
+            capacity: 1,
+            floor: 1,
+            notes: 'Animal-themed house resident space',
+            beds: { create: [{ bedLabel: 'Resident' }] },
+          },
+        });
+      }
+    }
+  }
 }
 
 main()

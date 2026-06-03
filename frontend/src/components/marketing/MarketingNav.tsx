@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Home, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { navLinks } from '@/lib/hideawayMarketing';
 
 export function MarketingNav() {
@@ -7,9 +7,7 @@ export function MarketingNav() {
     <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-[#fffaf2]/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <Link href="/" className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-white shadow-sm">
-            <Home className="h-5 w-5" />
-          </span>
+          <img src="/hideaway-logo.png" alt="Hideaway Holler" className="h-11 w-11 shrink-0 rounded-full object-cover shadow-sm" />
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold text-stone-950">Hideaway Holler</span>
             <span className="block truncate text-xs text-stone-600">Cultural Exchange Community</span>

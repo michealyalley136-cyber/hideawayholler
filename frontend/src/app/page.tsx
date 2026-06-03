@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, CheckCircle2, Mail, MapPin, ShieldCheck, Trees } from 'lucide-react';
+import { ArrowRight, Bus, CheckCircle2, CloudSun, Mail, MapPin, ShieldCheck, Star, Trees } from 'lucide-react';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
 import { MarketingImage } from '@/components/marketing/MarketingImage';
 import { MarketingNav } from '@/components/marketing/MarketingNav';
@@ -10,6 +10,7 @@ import {
   propertyHighlights,
   safetyItems,
 } from '@/lib/hideawayMarketing';
+import { seviervilleWeather } from '@/lib/hideawayInfo';
 
 export default function LandingPage() {
   return (
@@ -173,6 +174,78 @@ export default function LandingPage() {
                   alt={image.alt}
                   wrapperClassName={index === 0 || index === 5 ? 'aspect-[4/5] rounded-lg md:row-span-2' : 'aspect-square rounded-lg'}
                 />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-[#fffaf2] py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-5 md:grid-cols-3">
+              <div className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+                <CloudSun className="h-7 w-7 text-amber-600" />
+                <h2 className="mt-4 text-xl font-bold text-stone-950">Current Weather</h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  {seviervilleWeather.temperature} and {seviervilleWeather.condition.toLowerCase()} in Sevierville.
+                  Rain chance: {seviervilleWeather.rainChance}.
+                </p>
+              </div>
+              <div className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+                <Bus className="h-7 w-7 text-emerald-800" />
+                <h2 className="mt-4 text-xl font-bold text-stone-950">Transportation Information</h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  Residents can access Sevierville Transit details, Uber/Lyft guidance, and local travel resources in the portal.
+                </p>
+              </div>
+              <div className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+                <CheckCircle2 className="h-7 w-7 text-emerald-800" />
+                <h2 className="mt-4 text-xl font-bold text-stone-950">Before You Arrive</h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  Wi-Fi, house assignment, weather, transit, community rules, and emergency contacts are organized before arrival.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white py-16">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <p className="text-sm font-semibold uppercase text-amber-700">Resident Reviews</p>
+                <h2 className="mt-2 text-3xl font-bold text-stone-950 sm:text-4xl">What Residents Are Saying</h2>
+              </div>
+              <Star className="h-9 w-9 text-amber-500" />
+            </div>
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              {[
+                ['A welcoming place to arrive', 'Hideaway Holler made it easy to settle in, meet other students, and stay organized.'],
+                ['Support when we need it', 'The portal keeps notices, maintenance, and housing information in one place.'],
+                ['Community living in the Smokies', 'The shared spaces and local guide helped us feel connected outside of work.'],
+              ].map(([title, quote]) => (
+                <article key={title} className="rounded-lg border border-stone-200 bg-[#fffaf2] p-5">
+                  <div className="flex gap-1 text-amber-500">
+                    {[0, 1, 2, 3, 4].map((i) => <Star key={i} className="h-4 w-4 fill-current" />)}
+                  </div>
+                  <h3 className="mt-4 font-semibold text-stone-950">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-stone-600">{quote}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-[#f0f7f4] py-16">
+          <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
+            <div>
+              <p className="text-sm font-semibold uppercase text-emerald-900">Community Living</p>
+              <h2 className="mt-2 text-3xl font-bold text-stone-950 sm:text-4xl">House-based support for everyday life.</h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {['Bear House', 'Deer House', 'Elk House', 'Fox House'].map((house) => (
+                <div key={house} className="rounded-lg bg-white p-4 text-sm font-semibold text-stone-800 shadow-sm">
+                  {house} / 8 resident spaces
+                </div>
               ))}
             </div>
           </div>

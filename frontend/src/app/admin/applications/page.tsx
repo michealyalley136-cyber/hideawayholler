@@ -28,13 +28,13 @@ export default function AdminApplicationsPage() {
         <div className="space-y-4">
           {applications.map((a) => (
             <Card key={a.id}>
-              <CardBody className="flex flex-wrap justify-between items-center gap-4">
+              <CardBody className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                   <p className="font-medium">{a.user.profile?.fullName || a.user.email}</p>
                   <p className="text-sm text-slate-500">{a.season.name}</p>
                   <Badge className="mt-2 bg-amber-100 text-amber-800">{a.status}</Badge>
                 </div>
-                <div className="flex gap-2">
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
                   <Button size="sm" onClick={() => review(a.id, 'APPROVED')}>Approve</Button>
                   <Button size="sm" variant="outline" onClick={() => review(a.id, 'REJECTED')}>Reject</Button>
                 </div>

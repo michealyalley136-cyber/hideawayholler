@@ -74,8 +74,10 @@ app.get('/', (_req, res) => {
 app.use('/api', routes);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`HollerHub API running on http://localhost:${PORT}`);
-});
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`HollerHub API running on http://localhost:${PORT}`);
+  });
+}
 
 export default app;

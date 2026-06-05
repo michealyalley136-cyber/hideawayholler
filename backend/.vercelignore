@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+dist
+node_modules
+uploads
+private_uploads
+.pgdata
+*.log
+*.err.log
+*.out.log

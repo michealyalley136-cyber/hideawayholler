@@ -110,22 +110,28 @@ Base URL: `/api`
 | Check-in/out | `GET/POST /check-in`, `POST /check-in/:id/approve` |
 | Emergency | `GET /emergency` |
 
-## Railway deployment
+## Vercel deployment
 
-1. Create a Railway project with **PostgreSQL** + two services (API + Web).
-2. **Backend service**
-   - Root: `backend`
-   - Set `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`, `PORT`
-   - Build: `npm install && npx prisma generate && npm run build`
-   - Start: `npx prisma db push && npm run db:seed && npm run start`
-3. **Frontend service**
-   - Root: `frontend`
-   - Set `NEXT_PUBLIC_API_URL` to your backend URL, without `/api`
-   - Set `NEXT_PUBLIC_UPLOADS_URL` to backend URL + `/uploads`
-   - Build: `npm install && npm run build`
-   - Start: `npm run start`
+Deploy this repo as two Vercel projects.
 
-For production file storage, implement the `StorageAdapter` in `backend/src/utils/storage.ts` for S3.
+1. **Backend API project**
+   - Root Directory: `backend`
+   - Framework Preset: Other
+   - Install Command: `npm ci`
+   - Build Command: `npx prisma generate && npm run build`
+   - Output Directory: leave blank
+   - API health URL after deploy: `https://your-backend-domain.vercel.app/api/health`
+   - Set backend env vars: `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`, `CORS_ORIGINS`, `NODE_ENV`
+2. **Frontend web project**
+   - Root Directory: `frontend`
+   - Framework Preset: Next.js
+   - Install Command: `npm ci`
+   - Build Command: `npm run build`
+   - Output Directory: leave blank
+   - Set `NEXT_PUBLIC_API_URL` to the backend Vercel URL, without `/api`
+   - Set `NEXT_PUBLIC_UPLOADS_URL` to the backend Vercel URL + `/uploads`
+
+For production file storage, local serverless uploads are not durable. Use Vercel Blob, S3, or another persistent storage adapter before relying on uploads in production.
 
 ## Environment variables
 
@@ -136,6 +142,7 @@ DATABASE_URL=postgresql://...
 PORT=5000
 JWT_SECRET=...
 FRONTEND_URL=http://localhost:3000
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://hollerhub.vercel.app
 UPLOAD_DIR=./uploads
 ```
 

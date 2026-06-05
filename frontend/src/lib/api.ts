@@ -5,7 +5,7 @@ const rawApiUrl = configuredApiUrl || (process.env.NODE_ENV !== 'production' ? l
 export const apiOrigin = rawApiUrl ? rawApiUrl.replace(/\/+$/, '').replace(/\/api$/, '') : '';
 export const apiUrl = apiOrigin ? `${apiOrigin}/api` : '';
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
   console.info('[api] Runtime API configuration', {
     hasNextPublicApiUrl: Boolean(configuredApiUrl),
     hasResolvedApiOrigin: Boolean(apiOrigin),

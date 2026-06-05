@@ -65,14 +65,14 @@ npm run db:seed
 npm run dev
 ```
 
-API runs at **http://localhost:4000**
+API runs at **http://localhost:5000**
 
 ### 3. Frontend
 
 ```bash
 cd frontend
 cp .env.example .env.local
-# Ensure NEXT_PUBLIC_API_URL=http://localhost:4000/api
+# Ensure NEXT_PUBLIC_API_URL=http://localhost:5000
 
 npm install
 npm run dev
@@ -120,7 +120,7 @@ Base URL: `/api`
    - Start: `npx prisma db push && npm run db:seed && npm run start`
 3. **Frontend service**
    - Root: `frontend`
-   - Set `NEXT_PUBLIC_API_URL` to your backend URL + `/api`
+   - Set `NEXT_PUBLIC_API_URL` to your backend URL, without `/api`
    - Set `NEXT_PUBLIC_UPLOADS_URL` to backend URL + `/uploads`
    - Build: `npm install && npm run build`
    - Start: `npm run start`
@@ -133,7 +133,7 @@ For production file storage, implement the `StorageAdapter` in `backend/src/util
 
 ```
 DATABASE_URL=postgresql://...
-PORT=4000
+PORT=5000
 JWT_SECRET=...
 FRONTEND_URL=http://localhost:3000
 UPLOAD_DIR=./uploads
@@ -142,8 +142,8 @@ UPLOAD_DIR=./uploads
 ### Frontend (`frontend/.env.local`)
 
 ```
-NEXT_PUBLIC_API_URL=http://localhost:4000/api
-NEXT_PUBLIC_UPLOADS_URL=http://localhost:4000/uploads
+NEXT_PUBLIC_API_URL=http://localhost:5000
+NEXT_PUBLIC_UPLOADS_URL=http://localhost:5000/uploads
 ```
 
 ## License

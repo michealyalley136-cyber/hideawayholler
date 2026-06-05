@@ -4,7 +4,14 @@ import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { getJourneySteps } from '../utils/residentJourney';
 import fs from 'fs';
-import { saveFile } from '../utils/storage';
+import { deleteFile, getPublicUrl, saveFile } from '../utils/storage';
+
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function getTargetUserId(req: AuthRequest) {
+  return req.params.userId || req.user!.userId;
+}
 
 export async function getProfile(req: AuthRequest, res: Response) {
   const userId = req.params.userId || req.user!.userId;
@@ -91,6 +98,56 @@ export async function uploadDocument(req: AuthRequest, res: Response) {
   });
 
   res.status(201).json({ document: doc });
+}
+
+export async function uploadAvatar(req: AuthRequest, res: Response) {
+  const targetUserId = getTargetUserId(req);
+  if (targetUserId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+  const profile = await prisma.residentProfile.findUnique({ where: { userId: targetUserId } });
+  if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+  if (profile.avatarUrl) {
+    const previous = profile.avatarUrl.replace(/^\/uploads\//, '');
+    deleteFile(previous);
+  }
+
+  const { filePath } = saveFile(fs.readFileSync(file.path), file.originalname, 'avatars');
+  const avatarUrl = getPublicUrl(filePath);
+
+  const updatedProfile = await prisma.residentProfile.update({
+    where: { userId: targetUserId },
+    data: { avatarUrl },
+  });
+
+  res.status(200).json({ profile: updatedProfile });
+}
+
+export async function deleteAvatar(req: AuthRequest, res: Response) {
+  const targetUserId = getTargetUserId(req);
+  if (targetUserId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const profile = await prisma.residentProfile.findUnique({ where: { userId: targetUserId } });
+  if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+  if (profile.avatarUrl) {
+    const previous = profile.avatarUrl.replace(/^\/uploads\//, '');
+    deleteFile(previous);
+  }
+
+  const updatedProfile = await prisma.residentProfile.update({
+    where: { userId: targetUserId },
+    data: { avatarUrl: null },
+  });
+
+  res.json({ profile: updatedProfile });
 }
 
 export async function listResidents(req: AuthRequest, res: Response) {

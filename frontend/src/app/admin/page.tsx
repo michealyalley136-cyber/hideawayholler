@@ -1,14 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   AlertCircle,
+  AlertTriangle,
   Bed,
   BedDouble,
   ClipboardList,
   CloudSun,
   CreditCard,
   Home,
+  History,
   PackageOpen,
   PlaneLanding,
   PlaneTakeoff,
@@ -40,6 +43,12 @@ export default function AdminDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <Link href="/admin/sos" className="block rounded-xl ring-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2">
+              <StatCard title="Active SOS alerts" value={stats?.activeSosAlerts ?? '...'} icon={AlertTriangle} accent="text-white bg-red-700" />
+            </Link>
+            <Link href="/admin/sos/history" className="block rounded-xl ring-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2">
+              <StatCard title="SOS History" value="Records" icon={History} accent="text-slate-700 bg-slate-100" />
+            </Link>
             <StatCard title="New applications" value={stats?.newApplications ?? '...'} icon={ClipboardList} accent="text-blue-600 bg-blue-50" />
             <StatCard title="Active residents" value={stats?.activeResidents ?? '...'} icon={UserCheck} accent="text-emerald-600 bg-emerald-50" />
             <StatCard title="Open maintenance" value={stats?.openMaintenance ?? '...'} icon={Wrench} accent="text-amber-600 bg-amber-50" />

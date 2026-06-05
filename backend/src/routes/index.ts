@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
+import adminRoutes from './admin.routes';
 import dashboardRoutes from './dashboard.routes';
 import seasonRoutes from './season.routes';
 import profileRoutes from './profile.routes';
@@ -16,6 +17,7 @@ import checkoutRoutes from './checkout.routes';
 import emergencyRoutes from './emergency.routes';
 import supplyRoutes from './supply.routes';
 import reviewRoutes from './review.routes';
+import sosRoutes from './sos.routes';
 
 const router = Router();
 
@@ -24,6 +26,7 @@ router.get('/health', (_req, res) => {
 });
 
 router.use('/auth', authRoutes);
+router.use('/admin', adminRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/seasons', seasonRoutes);
 router.use('/profiles', profileRoutes);
@@ -40,5 +43,6 @@ router.use('/check-out', checkoutRoutes);
 router.use('/emergency', emergencyRoutes);
 router.use('/supply-requests', supplyRoutes);
 router.use('/reviews', reviewRoutes);
+router.use('/sos', sosRoutes);
 
 export default router;

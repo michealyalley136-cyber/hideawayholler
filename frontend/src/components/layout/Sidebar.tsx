@@ -24,11 +24,12 @@ import {
   PackageOpen,
   Star,
   Wifi,
+  ShieldAlert,
 } from 'lucide-react';
 import { UserRole } from '@/lib/types';
 
 const residentNav = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/apply', label: 'Apply', icon: ClipboardList },
   { href: '/leases', label: 'Leases', icon: FileText },
@@ -39,6 +40,7 @@ const residentNav = [
   { href: '/before-arrival', label: 'Before Arrival', icon: ClipboardList },
   { href: '/internet', label: 'Internet', icon: Wifi },
   { href: '/supply-requests', label: 'Supply Requests', icon: PackageOpen },
+  { href: '/dashboard/emergency-sos', label: 'Emergency SOS', icon: ShieldAlert },
   { href: '/reviews', label: 'Reviews', icon: Star },
   { href: '/maintenance', label: 'Maintenance', icon: Wrench },
   { href: '/community-gallery', label: 'Gallery', icon: Image },
@@ -50,7 +52,8 @@ const residentNav = [
 ];
 
 const adminNav = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/admin/sos', label: 'SOS Center', icon: AlertTriangle },
   { href: '/admin/residents', label: 'Residents', icon: Users },
   { href: '/admin/seasons', label: 'Seasons', icon: Calendar },
   { href: '/admin/housing', label: 'Housing', icon: Building2 },
@@ -67,13 +70,13 @@ const adminNav = [
 ];
 
 const alumniNav = [
-  { href: '/alumni', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/alumni', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/alumni/history', label: 'History', icon: FileText },
   { href: '/apply', label: 'Reapply', icon: ClipboardList },
   { href: '/emergency', label: 'Emergency', icon: AlertTriangle },
 ];
 
-export function Sidebar({ role, onNavigate }: { role: UserRole; onNavigate?: () => void }) {
+export function Sidebar({ role, onNavigate, activeSosCount = 0 }: { role: UserRole; onNavigate?: () => void; activeSosCount?: number }) {
   const pathname = usePathname();
   const nav = role === 'ADMIN' ? adminNav : role === 'ALUMNI' ? alumniNav : residentNav;
 
@@ -87,7 +90,7 @@ export function Sidebar({ role, onNavigate }: { role: UserRole; onNavigate?: () 
         </div>
       </Link>
       {nav.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(item.href + '/');
+        const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/');
         return (
           <Link
             key={item.href}
@@ -99,7 +102,14 @@ export function Sidebar({ role, onNavigate }: { role: UserRole; onNavigate?: () 
             )}
           >
             <item.icon className="w-4 h-4 shrink-0" />
-            {item.label}
+            <span className="min-w-0 flex-1 truncate">
+              {item.href === '/admin/sos' && activeSosCount > 0 ? `Emergency Alerts (${activeSosCount})` : item.label}
+            </span>
+            {item.href === '/admin/sos' && activeSosCount > 0 && (
+              <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-700 px-1.5 py-0.5 text-xs font-bold text-white">
+                {activeSosCount}
+              </span>
+            )}
           </Link>
         );
       })}

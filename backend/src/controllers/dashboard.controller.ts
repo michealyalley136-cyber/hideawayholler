@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { PaymentStatus, MaintenanceStatus, ResidentStatus, SupplyRequestStatus, ReviewStatus } from '@prisma/client';
+import { PaymentStatus, MaintenanceStatus, ResidentStatus, SupplyRequestStatus, ReviewStatus, SosAlertStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { getJourneySteps } from '../utils/residentJourney';
@@ -26,6 +26,7 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
     departuresThisWeek,
     openSupplyRequests,
     pendingReviews,
+    activeSosAlerts,
   ] = await Promise.all([
     prisma.user.count({ where: { role: { in: ['RESIDENT', 'ALUMNI'] } } }),
     prisma.seasonResident.count({ where: { status: ResidentStatus.ACTIVE_RESIDENT } }),
@@ -43,6 +44,7 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
     }),
     prisma.supplyRequest.count({ where: { status: SupplyRequestStatus.OPEN } }),
     prisma.residentReview.count({ where: { status: ReviewStatus.PENDING } }),
+    prisma.sosAlert.count({ where: { status: { in: [SosAlertStatus.ACTIVE, SosAlertStatus.ACKNOWLEDGED, SosAlertStatus.NEEDS_HELP] } } }),
   ]);
 
   const vacantBeds = Math.max(0, beds - occupiedAssignments);
@@ -65,6 +67,7 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
       houseOccupancy,
       pendingReviews,
       weatherAlerts,
+      activeSosAlerts,
     },
   });
 }

@@ -61,7 +61,8 @@ export default function RegisterPage() {
           <p className={apiStatus === 'offline' ? 'mt-3 text-sm text-red-600' : 'mt-3 text-xs text-slate-400'}>
             {apiStatus === 'checking' && 'Checking backend connection...'}
             {apiStatus === 'online' && 'Backend connection ready.'}
-            {apiStatus === 'offline' && 'Backend is not reachable. Start the API on http://localhost:5000, then try again.'}
+            {apiStatus === 'offline' &&
+              'Backend is not reachable. Confirm NEXT_PUBLIC_API_URL points to the deployed backend API, or start the API on http://localhost:5000 for local development.'}
           </p>
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Input label="Full name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required />

@@ -1,7 +1,18 @@
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+const localApiUrl = 'http://localhost:5000';
+const rawApiUrl = configuredApiUrl || (process.env.NODE_ENV !== 'production' ? localApiUrl : '');
 
-export const apiOrigin = rawApiUrl.replace(/\/+$/, '').replace(/\/api$/, '');
-export const apiUrl = `${apiOrigin}/api`;
+export const apiOrigin = rawApiUrl ? rawApiUrl.replace(/\/+$/, '').replace(/\/api$/, '') : '';
+export const apiUrl = apiOrigin ? `${apiOrigin}/api` : '';
+
+if (typeof window !== 'undefined') {
+  console.info('[api] Runtime API configuration', {
+    hasNextPublicApiUrl: Boolean(configuredApiUrl),
+    hasResolvedApiOrigin: Boolean(apiOrigin),
+    usesLocalDevFallback: apiOrigin === localApiUrl,
+    nodeEnv: process.env.NODE_ENV,
+  });
+}
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) {
@@ -16,17 +27,29 @@ function getToken(): string | null {
 
 function apiPath(path: string) {
   if (/^https?:\/\//.test(path)) return path;
+  if (!apiUrl) {
+    throw new ApiError(0, 'HollerHub API is not configured. Set NEXT_PUBLIC_API_URL to the deployed backend URL.');
+  }
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${apiUrl}${cleanPath}`;
 }
 
 function errorMessageForNetworkFailure() {
-  return `Unable to reach the HollerHub API at ${apiOrigin}. Confirm the backend is running on http://localhost:5000.`;
+  if (!apiOrigin) {
+    return 'HollerHub API is not configured. Set NEXT_PUBLIC_API_URL to the deployed backend URL.';
+  }
+
+  if (apiOrigin === localApiUrl) {
+    return `Unable to reach the HollerHub API at ${apiOrigin}. Confirm the backend is running on ${localApiUrl}.`;
+  }
+
+  return `Unable to reach the HollerHub API at ${apiOrigin}. Confirm the backend is deployed and NEXT_PUBLIC_API_URL is correct.`;
 }
 
 export async function apiHealth() {
-  const url = `${apiUrl}/health`;
+  let url = '';
   try {
+    url = apiPath('/health');
     const res = await fetch(url, { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -43,15 +66,16 @@ export async function apiHealth() {
 
 export async function api<T>(
   path: string,
-  options: Omit<RequestInit, 'body'> & { body?: unknown } = {}
+  options: Omit<RequestInit, 'body'> & { body?: unknown; suppressErrorLog?: boolean } = {}
 ): Promise<T> {
-  const { body, headers, ...rest } = options;
+  const { body, headers, suppressErrorLog, ...rest } = options;
   const token = getToken();
-  const url = apiPath(path);
+  let url = '';
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
 
   let res: Response;
   try {
+    url = apiPath(path);
     res = await fetch(url, {
       ...rest,
       headers: {
@@ -62,7 +86,9 @@ export async function api<T>(
       body: isFormData ? body : body ? JSON.stringify(body) : undefined,
     });
   } catch (err) {
-    console.error('[api] Network error', { url, method: rest.method || 'GET', err });
+    if (!suppressErrorLog) {
+      console.error('[api] Network error', { url, method: rest.method || 'GET', err });
+    }
     throw new ApiError(0, errorMessageForNetworkFailure(), err);
   }
 
@@ -78,7 +104,9 @@ export async function api<T>(
 
   if (!res.ok) {
     const message = data.error || data.message || `Request failed with status ${res.status}`;
-    console.error('[api] Backend error response', { url, status: res.status, data });
+    if (!suppressErrorLog) {
+      console.error('[api] Backend error response', { url, status: res.status, data });
+    }
 
     const isAuthRequest = path === '/auth/login' || path === '/auth/register';
     if (typeof window !== 'undefined' && !isAuthRequest) {
@@ -101,9 +129,9 @@ export async function api<T>(
   return data as T;
 }
 
-export const uploadsUrl = process.env.NEXT_PUBLIC_UPLOADS_URL || `${apiOrigin}/uploads`;
+export const uploadsUrl = process.env.NEXT_PUBLIC_UPLOADS_URL || (apiOrigin ? `${apiOrigin}/uploads` : '');
 
 export function fileUrl(path?: string | null) {
-  if (!path) return null;
+  if (!path || !uploadsUrl) return null;
   return `${uploadsUrl}/${path}`;
 }

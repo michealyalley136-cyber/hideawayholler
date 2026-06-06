@@ -49,20 +49,28 @@ function errorMessageForNetworkFailure() {
 }
 
 export async function apiHealth() {
-  let url = '';
+  // Explicitly check the configured API health endpoint so the error message
+  // can show the exact route we attempted.
+  const healthUrl = apiUrl ? `${apiUrl}/health` : '';
+  if (!healthUrl) {
+    throw new ApiError(0, 'HollerHub API is not configured. Set NEXT_PUBLIC_API_URL to the backend base URL (e.g. https://hollerhub-api.vercel.app)');
+  }
+
   try {
-    url = apiPath('/health');
-    const res = await fetch(url, { cache: 'no-store' });
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.info('[apiHealth] Checking backend health at', healthUrl);
+    }
+    const res = await fetch(healthUrl, { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      console.error('[apiHealth] Backend health check failed', { url, status: res.status, data });
-      throw new ApiError(res.status, data.error || data.message || 'Backend health check failed', data);
+      console.error('[apiHealth] Backend health check failed', { url: healthUrl, status: res.status, data });
+      throw new ApiError(res.status, data.error || data.message || `Backend health check failed at ${healthUrl}`, data);
     }
     return data as { status: string; service: string };
   } catch (err) {
     if (err instanceof ApiError) throw err;
-    console.error('[apiHealth] Backend health check network error', { url, err });
-    throw new ApiError(0, errorMessageForNetworkFailure(), err);
+    console.error('[apiHealth] Backend health check network error', { url: healthUrl, err });
+    throw new ApiError(0, `Unable to reach the HollerHub API at ${healthUrl}. Confirm the backend is running and NEXT_PUBLIC_API_URL is correct.`, err);
   }
 }
 

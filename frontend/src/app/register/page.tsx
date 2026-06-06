@@ -8,10 +8,10 @@ import { getDashboardPath } from '@/lib/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, apiHealth } from '@/lib/api';
 
 function checkBackendHealth() {
-  return api<{ status: string; service: string }>('/health', { cache: 'no-store' });
+  return apiHealth();
 }
 
 export default function RegisterPage() {
@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [apiError, setApiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -31,10 +32,14 @@ export default function RegisterPage() {
 
   useEffect(() => {
     checkBackendHealth()
-      .then(() => setApiStatus('online'))
+      .then(() => {
+        setApiStatus('online');
+        setApiError(null);
+      })
       .catch((err) => {
         console.error('[register] /api/health failed', err);
         setApiStatus('offline');
+        setApiError(err instanceof Error ? err.message : String(err));
       });
   }, []);
 
@@ -71,8 +76,7 @@ export default function RegisterPage() {
           <p className={apiStatus === 'offline' ? 'mt-3 text-sm text-red-600' : 'mt-3 text-xs text-slate-400'}>
             {apiStatus === 'checking' && 'Checking backend connection...'}
             {apiStatus === 'online' && 'Backend connection ready.'}
-            {apiStatus === 'offline' &&
-              'Backend is not reachable. Confirm NEXT_PUBLIC_API_URL points to the deployed backend API, or start the API on http://localhost:5000 for local development.'}
+            {apiStatus === 'offline' && (apiError || 'Backend is not reachable. Confirm NEXT_PUBLIC_API_URL points to the deployed backend API, or start the API on http://localhost:5000 for local development.')}
           </p>
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Input label="Full name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required />

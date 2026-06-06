@@ -54,16 +54,26 @@ export function useAuth(required = false) {
       console.debug('[auth] login API response received', { userId: data.user?.id, role: data.user?.role });
     }
 
-    // Save auth before navigating.
     setAuth(data.token, data.user, rememberMe);
+    const storedToken = getStoredToken();
+    const storedUser = getStoredUser();
+    const redirectPath = getDashboardPath(data.user.role);
 
     if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-      console.debug('[auth] login success; token saved', { userId: data.user?.id });
-      console.debug('[auth] redirecting to', getDashboardPath(data.user.role));
+      console.debug('[auth] login success; token saved', { userId: data.user?.id, hasToken: Boolean(storedToken), hasUser: Boolean(storedUser) });
+      console.debug('[auth] redirecting to', redirectPath);
     }
 
     setUser(data.user);
-    router.push(getDashboardPath(data.user.role));
+    router.push(redirectPath);
+
+    return {
+      status: 200,
+      role: data.user.role,
+      redirectPath,
+      hasToken: Boolean(storedToken),
+      hasUser: Boolean(storedUser),
+    };
   };
 
   const register = async (

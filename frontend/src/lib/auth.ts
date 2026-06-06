@@ -57,9 +57,10 @@ export function clearAuth() {
   sessionStorage.removeItem(AUTH_USER_KEY);
 }
 
-export function getDashboardPath(role: UserRole): string {
+export function getDashboardPath(role: UserRole | string): string {
   switch (role) {
     case 'ADMIN':
+    case 'SUPERADMIN':
       return '/admin/dashboard';
     case 'ALUMNI':
       return '/alumni';

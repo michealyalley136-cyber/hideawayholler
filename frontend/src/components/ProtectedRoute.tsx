@@ -12,14 +12,7 @@ export function ProtectedRoute({
   children: React.ReactNode;
   roles?: UserRole[];
 }) {
-  const { user, loading } = useAuth(true);
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && user && roles && !roles.includes(user.role)) {
-      router.push(user.role === 'ADMIN' ? '/admin' : '/dashboard');
-    }
-  }, [user, loading, roles, router]);
+  const { user, loading } = useAuth(false);
 
   if (loading) {
     return (

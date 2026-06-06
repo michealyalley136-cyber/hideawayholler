@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [debugLines, setDebugLines] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -29,22 +30,38 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
+  const appendDebugLine = (line: string) => {
+    setDebugLines((prev) => [...prev.slice(-7), line]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    setDebugLines([]);
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.debug('[login] submit started', { email, rememberMe });
-    }
+    appendDebugLine('Login request sent');
 
     try {
-      await login(email, password, rememberMe);
+      const result = await login(email, password, rememberMe);
+
+      appendDebugLine(`Login response status: ${result.status}`);
+      appendDebugLine(`Token received: ${result.hasToken ? 'yes' : 'no'}`);
+      appendDebugLine(`User role received: ${result.role}`);
+      appendDebugLine(`Redirect path selected: ${result.redirectPath}`);
+      appendDebugLine('Redirect attempted');
+
       if (process.env.NODE_ENV !== 'production') {
-        console.debug('[login] login() resolved');
+        console.debug('[login] submit complete', {
+          role: result.role,
+          redirectPath: result.redirectPath,
+          hasToken: result.hasToken,
+          hasUser: result.hasUser,
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
+      appendDebugLine(`Login failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -96,6 +113,13 @@ export default function LoginPage() {
               Sign in
             </Button>
           </form>
+          {debugLines.length > 0 && (
+            <div className="mt-4 space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              {debugLines.map((line, index) => (
+                <p key={index}>{line}</p>
+              ))}
+            </div>
+          )}
           <p className="mt-4 text-sm text-center text-slate-600">
             New here?{' '}
             <Link href="/register" className="text-brand-600 font-medium hover:underline">

@@ -2,6 +2,7 @@ const CACHE_VERSION = 'hollerhub-static-v1';
 const STATIC_ASSETS = [
   '/offline',
   '/manifest.webmanifest',
+  '/admin-sos.webmanifest',
   '/favicon.ico',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -57,4 +58,48 @@ self.addEventListener('fetch', (event) => {
         .catch(() => caches.match('/offline'))
     );
   }
+});
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+
+  const title = data.title || 'Emergency SOS Alert';
+  const body = data.body || 'A resident emergency alert has been triggered. Open the SOS console.';
+  const alertId = data.alertId || data.id;
+  const url = data.url || (alertId ? `/admin-sos?alertId=${encodeURIComponent(alertId)}` : '/admin-sos');
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: alertId ? `sos-${alertId}` : 'sos-alert',
+      silent: false,
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [900, 250, 900, 250, 900],
+      data: { url },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/admin-sos';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client && client.url.includes('/admin-sos')) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
 });

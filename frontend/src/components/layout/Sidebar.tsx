@@ -82,14 +82,17 @@ export function Sidebar({ role, onNavigate, activeSosCount = 0 }: { role: UserRo
   const homeHref = role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
 
   return (
-    <nav className="flex min-w-0 flex-col gap-1 p-3">
-      <Link href={homeHref} className="flex items-center gap-2 px-3 py-3 mb-2" onClick={onNavigate}>
-        <img src="/hideaway-logo.png" alt="Hideaway Holler" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-        <div>
-          <p className="font-semibold text-slate-900 text-sm">HollerHub</p>
-          <p className="text-xs text-slate-500">Hideaway Holler</p>
-        </div>
-      </Link>
+    <>
+      <div className="shrink-0 p-3">
+        <Link href={homeHref} className="flex items-center gap-2 px-3 py-3" onClick={onNavigate}>
+          <img src="/hideaway-logo.png" alt="Hideaway Holler" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+          <div>
+            <p className="font-semibold text-slate-900 text-sm">HollerHub</p>
+            <p className="text-xs text-slate-500">Hideaway Holler</p>
+          </div>
+        </Link>
+      </div>
+      <nav className="flex min-w-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-10">
       {nav.map((item) => {
         const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/');
         return (
@@ -114,6 +117,7 @@ export function Sidebar({ role, onNavigate, activeSosCount = 0 }: { role: UserRo
           </Link>
         );
       })}
-    </nav>
+      </nav>
+    </>
   );
 }

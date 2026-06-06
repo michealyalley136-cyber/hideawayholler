@@ -2,6 +2,12 @@ import { Response } from 'express';
 import { SosAlertStatus, SosEventType, UserRole } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
+import {
+  markEmergencyAlertAcknowledged,
+  markEmergencyAlertResolved,
+  scheduleSosFallbacks,
+  sendSosPushNotifications,
+} from '../services/emergencyNotification.service';
 
 const ACTIVE_STATUSES = [
   SosAlertStatus.ACTIVE,
@@ -108,6 +114,7 @@ async function updateSosAcknowledgement(sosAlertId: string, adminId: string) {
   });
 
   console.info('[sos admin] Alert acknowledged', { sosAlertId: updated.id, adminId });
+  await markEmergencyAlertAcknowledged(updated.id);
   return updated;
 }
 
@@ -274,6 +281,13 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
   });
 
   console.info('[sos resident] SOS record created successfully', { sosAlertId: alert.id, residentId: req.user!.userId });
+  void sendSosPushNotifications(alert).catch((err) => {
+    console.warn('[sos resident] SOS push notification dispatch failed', {
+      sosAlertId: alert.id,
+      message: err instanceof Error ? err.message : 'Unknown error',
+    });
+  });
+  scheduleSosFallbacks(alert.id);
   res.status(201).json({ alert });
 }
 
@@ -367,6 +381,9 @@ export async function residentSosAction(req: AuthRequest, res: Response) {
     });
   }
 
+  if (action === 'SAFE') {
+    await markEmergencyAlertResolved(updated.id);
+  }
   res.json({ alert: updated });
 }
 
@@ -609,5 +626,6 @@ export async function adminSosAction(req: AuthRequest, res: Response) {
     return resolved;
   });
 
+  await markEmergencyAlertResolved(updated.id);
   res.json({ alert: updated });
 }

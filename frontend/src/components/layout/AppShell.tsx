@@ -18,10 +18,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen min-w-0 flex">
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-slate-200">
+    <div className="flex min-h-screen min-w-0">
+      <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white lg:flex">
         <Sidebar role={user.role} activeSosCount={activeSosCount} />
-        <div className="mt-auto p-4 border-t border-slate-100">
+        <div className="shrink-0 border-t border-slate-100 p-4">
           <p className="text-sm font-medium text-slate-900 truncate">{user.profile?.fullName || user.email}</p>
           <p className="text-xs text-slate-500 capitalize">{user.role.toLowerCase()}</p>
           <Button variant="ghost" size="sm" className="mt-2 w-full justify-start" onClick={logout}>
@@ -33,12 +33,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside className="relative flex h-full w-80 max-w-[88vw] flex-col overflow-y-auto bg-white shadow-xl">
+          <aside className="relative flex h-full w-80 max-w-[88vw] flex-col overflow-hidden bg-white shadow-xl">
             <button className="absolute top-4 right-4 rounded-lg p-2 hover:bg-slate-100" onClick={() => setMobileOpen(false)} aria-label="Close navigation">
               <X className="w-5 h-5" />
             </button>
             <Sidebar role={user.role} onNavigate={() => setMobileOpen(false)} activeSosCount={activeSosCount} />
-            <div className="mt-auto p-4 border-t">
+            <div className="shrink-0 border-t p-4">
               <Button variant="outline" size="sm" className="w-full" onClick={logout}>
                 Sign out
               </Button>
@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="min-w-0 flex-1 lg:pl-64">
+      <div className="min-h-screen min-w-0 flex-1 lg:pl-64">
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200 px-3 py-3 flex items-center gap-3 lg:px-8">
           <button className="lg:hidden min-h-11 min-w-11 rounded-lg p-2 hover:bg-slate-100" onClick={() => setMobileOpen(true)} aria-label="Open navigation">
             <Menu className="w-5 h-5" />

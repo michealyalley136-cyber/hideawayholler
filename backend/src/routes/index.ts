@@ -18,6 +18,7 @@ import emergencyRoutes from './emergency.routes';
 import supplyRoutes from './supply.routes';
 import reviewRoutes from './review.routes';
 import sosRoutes from './sos.routes';
+import adminDeviceRoutes from './adminDevice.routes';
 
 const router = Router();
 
@@ -44,5 +45,6 @@ router.use('/emergency', emergencyRoutes);
 router.use('/supply-requests', supplyRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/sos', sosRoutes);
+router.use('/admin-devices', adminDeviceRoutes);
 
 export default router;

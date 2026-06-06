@@ -282,6 +282,7 @@ model User {
   communityReportsReviewed CommunityReport[] @relation("CommunityReportReviewer")
   communityAlbumsCreated CommunityAlbum[]
   communityAlbumUploads CommunityAlbumImage[]
+  adminDevices AdminDevice[]
 }
 
 model Season {
@@ -601,6 +602,8 @@ model SosAlert {
   resident        User                 @relation(fields: [residentId], references: [id], onDelete: Cascade)
   locationHistory SosLocationHistory[]
   eventLogs       SosEventLog[]
+  emergencyAlert  EmergencyAlert?
+  notificationLogs EmergencyNotificationLog[]
 
   @@index([residentId, status])
   @@index([status, createdAt])
@@ -643,6 +646,62 @@ model SosLocationHistory {
 
   @@index([sosAlertId, createdAt])
   @@map("sos_location_history")
+}
+
+model AdminDevice {
+  id          String   @id @default(uuid())
+  adminId     String
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  userAgent   String?
+  deviceLabel String?
+  enabled     Boolean  @default(true)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  admin            User                       @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  notificationLogs EmergencyNotificationLog[]
+
+  @@index([adminId, enabled])
+  @@map("admin_devices")
+}
+
+model EmergencyAlert {
+  id             String    @id @default(uuid())
+  sosAlertId     String    @unique
+  status         String    @default("ACTIVE")
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sosAlert         SosAlert                   @relation(fields: [sosAlertId], references: [id], onDelete: Cascade)
+  notificationLogs EmergencyNotificationLog[]
+
+  @@index([status, createdAt])
+  @@map("emergency_alerts")
+}
+
+model EmergencyNotificationLog {
+  id               String   @id @default(uuid())
+  emergencyAlertId String?
+  sosAlertId       String?
+  adminDeviceId    String?
+  channel          String
+  status           String
+  message          String?
+  createdAt        DateTime @default(now())
+
+  emergencyAlert EmergencyAlert? @relation(fields: [emergencyAlertId], references: [id], onDelete: Cascade)
+  sosAlert       SosAlert?       @relation(fields: [sosAlertId], references: [id], onDelete: Cascade)
+  adminDevice    AdminDevice?    @relation(fields: [adminDeviceId], references: [id], onDelete: SetNull)
+
+  @@index([sosAlertId, createdAt])
+  @@index([emergencyAlertId, createdAt])
+  @@index([channel, status, createdAt])
+  @@map("emergency_notification_logs")
 }
 
 model GalleryAlbum {

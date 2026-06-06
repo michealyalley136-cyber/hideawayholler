@@ -18,8 +18,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen min-w-0">
-      <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+    <div className="min-h-screen min-w-0 bg-slate-50 lg:grid lg:h-dvh lg:grid-cols-[260px_1fr] lg:overflow-hidden">
+      <aside className="hidden h-dvh min-h-0 flex-col border-r border-slate-200 bg-white lg:flex">
         <Sidebar role={user.role} activeSosCount={activeSosCount} />
         <div className="shrink-0 border-t border-slate-100 p-4">
           <p className="text-sm font-medium text-slate-900 truncate">{user.profile?.fullName || user.email}</p>
@@ -33,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside className="relative flex h-full w-80 max-w-[88vw] flex-col overflow-hidden bg-white shadow-xl">
+          <aside className="relative flex h-dvh min-h-0 w-80 max-w-[88vw] flex-col overflow-hidden bg-white shadow-xl">
             <button className="absolute top-4 right-4 rounded-lg p-2 hover:bg-slate-100" onClick={() => setMobileOpen(false)} aria-label="Close navigation">
               <X className="w-5 h-5" />
             </button>
@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="min-h-screen min-w-0 flex-1 lg:pl-64">
+      <main className="min-h-screen min-w-0 lg:min-h-0 lg:overflow-y-auto">
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200 px-3 py-3 flex items-center gap-3 lg:px-8">
           <button className="lg:hidden min-h-11 min-w-11 rounded-lg p-2 hover:bg-slate-100" onClick={() => setMobileOpen(true)} aria-label="Open navigation">
             <Menu className="w-5 h-5" />
@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </header>
         {user.role === 'ADMIN' && <AdminSosNotifier onCountChange={setActiveSosCount} />}
-        <main className="mx-auto w-full max-w-6xl min-w-0 p-3 pb-24 sm:p-4 sm:pb-24 lg:p-8">{children}</main>
+        <div className="mx-auto w-full max-w-6xl min-w-0 p-3 pb-24 sm:p-4 sm:pb-24 lg:p-8">{children}</div>
         {user.role !== 'ADMIN' && (
           <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
             {[
@@ -95,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
         )}
-      </div>
+      </main>
     </div>
   );
 }

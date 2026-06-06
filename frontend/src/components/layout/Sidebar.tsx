@@ -92,31 +92,33 @@ export function Sidebar({ role, onNavigate, activeSosCount = 0 }: { role: UserRo
           </div>
         </Link>
       </div>
-      <nav className="flex min-w-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-10">
-      {nav.map((item) => {
-        const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/');
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={clsx(
-              'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-              active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-            )}
-          >
-            <item.icon className="w-4 h-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">
-              {item.href === '/admin/sos' && activeSosCount > 0 ? `Emergency Alerts (${activeSosCount})` : item.label}
-            </span>
-            {item.href === '/admin/sos' && activeSosCount > 0 && (
-              <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-700 px-1.5 py-0.5 text-xs font-bold text-white">
-                {activeSosCount}
-              </span>
-            )}
-          </Link>
-        );
-      })}
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-24">
+        <div className="flex min-w-0 flex-col gap-1">
+          {nav.map((item) => {
+            const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + '/');
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                className={clsx(
+                  'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+                )}
+              >
+                <item.icon className="w-4 h-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">
+                  {item.href === '/admin/sos' && activeSosCount > 0 ? `Emergency Alerts (${activeSosCount})` : item.label}
+                </span>
+                {item.href === '/admin/sos' && activeSosCount > 0 && (
+                  <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-700 px-1.5 py-0.5 text-xs font-bold text-white">
+                    {activeSosCount}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </>
   );

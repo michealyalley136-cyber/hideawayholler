@@ -130,7 +130,7 @@ export async function api<T>(
 
       if (res.status === 403) {
         clearAuth();
-        window.location.assign('/portal');
+        window.location.assign('/login');
         return new Promise<T>(() => {});
       }
     }

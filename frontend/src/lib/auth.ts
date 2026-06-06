@@ -2,6 +2,7 @@ import { User, UserRole } from './types';
 
 const AUTH_TOKEN_KEY = 'token';
 const AUTH_USER_KEY = 'user';
+const AUTH_LAST_ACTIVITY_KEY = 'auth:lastActivity';
 
 type StorageType = 'local' | 'session';
 
@@ -9,7 +10,7 @@ function getStorage(type: StorageType) {
   return type === 'local' ? localStorage : sessionStorage;
 }
 
-function getActiveStorage(): StorageType | null {
+export function getActiveAuthStorage(): StorageType | null {
   if (typeof window === 'undefined') return null;
   if (localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_USER_KEY)) return 'local';
   if (sessionStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_USER_KEY)) return 'session';
@@ -37,16 +38,33 @@ export function setAuth(token: string, user: User, rememberMe = true) {
   const storage = getStorage(rememberMe ? 'local' : 'session');
   storage.setItem(AUTH_TOKEN_KEY, token);
   storage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  if (!rememberMe) storage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
 
   const otherStorage = getStorage(rememberMe ? 'session' : 'local');
   otherStorage.removeItem(AUTH_TOKEN_KEY);
   otherStorage.removeItem(AUTH_USER_KEY);
+  otherStorage.removeItem(AUTH_LAST_ACTIVITY_KEY);
 }
 
 export function setStoredUser(user: User) {
   if (typeof window === 'undefined') return;
-  const activeType = getActiveStorage() ?? 'local';
+  const activeType = getActiveAuthStorage() ?? 'local';
   getStorage(activeType).setItem(AUTH_USER_KEY, JSON.stringify(user));
+}
+
+export function touchSessionActivity() {
+  if (typeof window === 'undefined') return;
+  if (getActiveAuthStorage() === 'session') {
+    sessionStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
+  }
+}
+
+export function getSessionLastActivity(): number | null {
+  if (typeof window === 'undefined') return null;
+  const raw = sessionStorage.getItem(AUTH_LAST_ACTIVITY_KEY);
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
 }
 
 export function clearAuth() {
@@ -55,6 +73,7 @@ export function clearAuth() {
   localStorage.removeItem(AUTH_USER_KEY);
   sessionStorage.removeItem(AUTH_TOKEN_KEY);
   sessionStorage.removeItem(AUTH_USER_KEY);
+  sessionStorage.removeItem(AUTH_LAST_ACTIVITY_KEY);
 }
 
 export function getDashboardPath(role: UserRole | string): string {
@@ -63,7 +82,7 @@ export function getDashboardPath(role: UserRole | string): string {
     case 'SUPERADMIN':
       return '/admin/dashboard';
     case 'ALUMNI':
-      return '/alumni';
+      return '/dashboard';
     case 'RESIDENT':
     case 'APPLICANT':
     default:

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { getDashboardPath } from '@/lib/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
@@ -21,48 +22,22 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loginClicked, setLoginClicked] = useState(false);
-  const [loginSuccess, setLoginSuccess] = useState<'yes' | 'no' | 'pending'>('pending');
-  const [tokenSaved, setTokenSaved] = useState<'yes' | 'no' | 'pending'>('pending');
-  const [debugLines, setDebugLines] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
-      router.replace('/dashboard');
+      router.replace(getDashboardPath(user.role));
     }
   }, [user, router]);
-
-  const appendDebugLine = (message: string) => {
-    setDebugLines((prev) => [...prev, message]);
-  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    setLoginClicked(true);
-    setLoginSuccess('pending');
-    setTokenSaved('pending');
-    setDebugLines([]);
-
-    appendDebugLine('Login clicked');
-    appendDebugLine('API request sent');
 
     try {
-      const result = await login(email, password, rememberMe);
-
-      setLoginSuccess('yes');
-      setTokenSaved(result.hasToken ? 'yes' : 'no');
-      appendDebugLine(`Login success: yes`);
-      appendDebugLine(`Token saved: ${result.hasToken ? 'yes' : 'no'}`);
-      appendDebugLine('Redirecting to /dashboard');
-      router.replace('/dashboard');
+      await login(email, password, rememberMe);
     } catch (err) {
-      setLoginSuccess('no');
       setError(err instanceof Error ? err.message : 'Login failed');
-      appendDebugLine(`Login success: no`);
-      appendDebugLine(`Token saved: no`);
-      appendDebugLine(`Login failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -114,21 +89,6 @@ export default function LoginPage() {
               Sign in
             </Button>
           </form>
-          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-            <p className="font-semibold text-slate-800">Login debug</p>
-            <p className="text-xs text-slate-500">Login clicked: {loginClicked ? 'yes' : 'no'}</p>
-            <p className="text-xs text-slate-500">API request sent: {loginClicked ? 'yes' : 'no'}</p>
-            <p className="text-xs text-slate-500">Login success: {loginSuccess}</p>
-            <p className="text-xs text-slate-500">Token saved: {tokenSaved}</p>
-            <p className="text-xs text-slate-500">Redirecting to /dashboard</p>
-          </div>
-          {debugLines.length > 0 && (
-            <div className="mt-4 space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              {debugLines.map((line, index) => (
-                <p key={index}>{line}</p>
-              ))}
-            </div>
-          )}
           <p className="mt-4 text-sm text-center text-slate-600">
             New here?{' '}
             <Link href="/register" className="text-brand-600 font-medium hover:underline">

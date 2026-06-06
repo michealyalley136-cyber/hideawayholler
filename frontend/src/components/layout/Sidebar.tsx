@@ -52,7 +52,7 @@ const residentNav = [
 ];
 
 const adminNav = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/sos', label: 'SOS Center', icon: AlertTriangle },
   { href: '/admin/residents', label: 'Residents', icon: Users },
   { href: '/admin/seasons', label: 'Seasons', icon: Calendar },
@@ -79,10 +79,11 @@ const alumniNav = [
 export function Sidebar({ role, onNavigate, activeSosCount = 0 }: { role: UserRole; onNavigate?: () => void; activeSosCount?: number }) {
   const pathname = usePathname();
   const nav = role === 'ADMIN' ? adminNav : role === 'ALUMNI' ? alumniNav : residentNav;
+  const homeHref = role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
 
   return (
     <nav className="flex min-w-0 flex-col gap-1 p-3">
-      <Link href="/" className="flex items-center gap-2 px-3 py-3 mb-2" onClick={onNavigate}>
+      <Link href={homeHref} className="flex items-center gap-2 px-3 py-3 mb-2" onClick={onNavigate}>
         <img src="/hideaway-logo.png" alt="Hideaway Holler" className="h-10 w-10 shrink-0 rounded-full object-cover" />
         <div>
           <p className="font-semibold text-slate-900 text-sm">HollerHub</p>

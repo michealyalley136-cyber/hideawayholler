@@ -18,9 +18,8 @@ export function MarketingFooter() {
           </a>
         </div>
         <nav className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-          <Link href="/apply" className="text-stone-300 hover:text-white">Apply</Link>
-          <Link href="/portal" className="text-stone-300 hover:text-white">Resident Portal</Link>
-          <Link href="/gallery" className="text-stone-300 hover:text-white">Gallery</Link>
+          <Link href="/login" className="text-stone-300 hover:text-white">Resident Portal</Link>
+          <Link href="/register" className="text-stone-300 hover:text-white">Create Account</Link>
           <a href="mailto:Hideawayhollerpf@gmail.com" className="text-stone-300 hover:text-white">Contact</a>
           <Link href="/privacy-policy" className="text-stone-300 hover:text-white">Privacy Policy</Link>
           <Link href="/terms" className="text-stone-300 hover:text-white">Terms</Link>

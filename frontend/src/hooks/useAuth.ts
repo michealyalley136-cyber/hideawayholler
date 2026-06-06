@@ -1,15 +1,34 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { getStoredToken, getStoredUser, setAuth, setStoredUser, clearAuth } from '@/lib/auth';
+import {
+  clearAuth,
+  getActiveAuthStorage,
+  getDashboardPath,
+  getSessionLastActivity,
+  getStoredToken,
+  getStoredUser,
+  setAuth,
+  setStoredUser,
+  touchSessionActivity,
+} from '@/lib/auth';
 import { User } from '@/lib/types';
+
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
 export function useAuth(required = false) {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const devLog = useCallback((message: string, details?: Record<string, unknown>) => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.debug(`[auth] ${message}`, details || {});
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -40,35 +59,67 @@ export function useAuth(required = false) {
     refresh();
   }, [required, refresh, router]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (getActiveAuthStorage() !== 'session') return;
+
+    touchSessionActivity();
+
+    const handleActivity = () => touchSessionActivity();
+    const checkInactivity = () => {
+      if (getActiveAuthStorage() !== 'session') return;
+      const lastActivity = getSessionLastActivity();
+      if (!lastActivity) {
+        touchSessionActivity();
+        return;
+      }
+
+      if (Date.now() - lastActivity >= SESSION_TIMEOUT_MS) {
+        devLog('session inactivity timeout; logging out');
+        clearAuth();
+        setUser(null);
+        router.replace('/login');
+      }
+    };
+
+    const events = ['click', 'keydown', 'scroll', 'pointerdown', 'touchstart'];
+    events.forEach((event) => window.addEventListener(event, handleActivity, { passive: true }));
+    const intervalId = window.setInterval(checkInactivity, 30_000);
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, handleActivity));
+      window.clearInterval(intervalId);
+    };
+  }, [devLog, pathname, router, user]);
+
   const login = async (email: string, password: string, rememberMe = true) => {
-    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-      console.debug('[auth] login submit started', { email });
-    }
+    devLog('login request started', { email });
 
     const data = await api<{ token: string; user: User }>('/auth/login', {
       method: 'POST',
       body: { email, password },
     });
 
-    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-      console.debug('[auth] login API response received', { userId: data.user?.id, role: data.user?.role });
-    }
+    devLog('login success', { userId: data.user?.id, role: data.user?.role });
 
     setAuth(data.token, data.user, rememberMe);
     const storedToken = getStoredToken();
     const storedUser = getStoredUser();
+    const redirectTarget = getDashboardPath(data.user.role);
 
-    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-      console.debug('[auth] login success; token saved', { userId: data.user?.id, hasToken: Boolean(storedToken), hasUser: Boolean(storedUser) });
-    }
+    devLog('token saved', { hasToken: Boolean(storedToken), storage: rememberMe ? 'localStorage' : 'sessionStorage' });
+    devLog('role detected', { role: data.user.role });
+    devLog('redirect target', { redirectTarget });
 
     setUser(data.user);
+    router.replace(redirectTarget);
 
     return {
       status: 200,
       role: data.user.role,
       hasToken: Boolean(storedToken),
       hasUser: Boolean(storedUser),
+      redirectTarget,
     };
   };
 
@@ -83,13 +134,13 @@ export function useAuth(required = false) {
     });
     setAuth(data.token, data.user, rememberMe);
     setUser(data.user);
-    router.push(redirectTo || '/dashboard');
+    router.replace(redirectTo || getDashboardPath(data.user.role));
   };
 
   const logout = () => {
     clearAuth();
     setUser(null);
-    router.push('/login');
+    router.replace('/login');
   };
 
   return { user, loading, login, register, logout, refresh };

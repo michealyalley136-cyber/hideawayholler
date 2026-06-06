@@ -21,11 +21,11 @@ type AdminReview = {
 
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
-  const load = () => api<{ reviews: AdminReview[] }>('/reviews/admin').then((d) => setReviews(d.reviews));
+  const load = () => api<{ reviews: AdminReview[] }>('/reviews?scope=admin').then((d) => setReviews(d.reviews));
   useEffect(() => { load(); }, []);
 
   const update = async (id: string, status: string, isFeatured = false) => {
-    await api(`/reviews/${id}`, { method: 'PATCH', body: { status, isFeatured } });
+    await api('/reviews', { method: 'PATCH', body: { id, status, isFeatured } });
     await load();
   };
 

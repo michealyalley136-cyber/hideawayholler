@@ -12,6 +12,17 @@ interface AdminSosNotifierProps {
   onCountChange?: (count: number) => void;
 }
 
+const SOS_SOUND_OPTIONS = [
+  { label: 'Default SOS Siren', url: '/sounds/sos-siren.mp3' },
+  { label: '11900601', url: '/sounds/11900601.mp3' },
+  { label: '49 20 Siren', url: '/sounds/49_20siren.mp3' },
+  { label: 'Danger Siren Alarm', url: '/sounds/danger-siren-alarm_BfknMds.mp3' },
+  { label: 'Police Sirens', url: '/sounds/police-sirens-10000006.mp3' },
+  { label: 'Siren DJ Sound Effect', url: '/sounds/siren-dj-sound-effect_m6o8Lt5.mp3' },
+];
+
+const DEFAULT_SOS_SOUND_URL = SOS_SOUND_OPTIONS[0].url;
+
 function formatDate(value?: string) {
   if (!value) return 'Not recorded';
   return new Intl.DateTimeFormat(undefined, {
@@ -39,6 +50,7 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
   const [actionId, setActionId] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [soundBlocked, setSoundBlocked] = useState(false);
+  const [selectedSoundUrl, setSelectedSoundUrl] = useState(DEFAULT_SOS_SOUND_URL);
   const [mutedAlertIds, setMutedAlertIds] = useState<Set<string>>(new Set());
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
@@ -119,13 +131,11 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
   }, [soundEnabled, startFallbackSiren]);
 
   useEffect(() => {
-    const audio = new Audio('/sounds/sos-siren.mp3');
-    audio.loop = true;
-    audio.volume = 1.0;
-    audio.preload = 'auto';
-    audio.load();
-    sirenAudioRef.current = audio;
     setSoundEnabled(localStorage.getItem('sosSoundEnabled') === 'true');
+    const storedSoundUrl = localStorage.getItem('sosSoundUrl');
+    if (storedSoundUrl && SOS_SOUND_OPTIONS.some((option) => option.url === storedSoundUrl)) {
+      setSelectedSoundUrl(storedSoundUrl);
+    }
 
     const storedMuted = localStorage.getItem('mutedSosAlertIds');
     if (storedMuted) {
@@ -139,6 +149,28 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
 
     return stopSiren;
   }, [stopSiren]);
+
+  useEffect(() => {
+    stopSiren();
+    const audio = new Audio(selectedSoundUrl);
+    audio.loop = true;
+    audio.volume = 1.0;
+    audio.preload = 'auto';
+    audio.load();
+    sirenAudioRef.current = audio;
+
+    return () => {
+      audio.pause();
+      audio.src = '';
+    };
+  }, [selectedSoundUrl, stopSiren]);
+
+  const selectSound = (url: string) => {
+    if (!SOS_SOUND_OPTIONS.some((option) => option.url === url)) return;
+    localStorage.setItem('sosSoundUrl', url);
+    setSelectedSoundUrl(url);
+    setSoundBlocked(false);
+  };
 
   const pollActiveAlerts = useCallback(async () => {
     console.info('[sos admin] Polling active SOS alerts');
@@ -255,6 +287,22 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
 
   const pendingAlerts = alerts.filter((alert) => !alert.adminAcknowledged && alert.status === 'ACTIVE');
   const audiblePendingAlerts = pendingAlerts.filter((alert) => !mutedAlertIds.has(alert.id));
+  const renderSoundPicker = () => (
+    <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold">
+      <span>SOS sound</span>
+      <select
+        value={selectedSoundUrl}
+        onChange={(event) => selectSound(event.target.value)}
+        className="min-h-10 rounded-lg border border-current/30 bg-white px-2 py-1 text-sm font-semibold text-slate-900 shadow-sm"
+      >
+        {SOS_SOUND_OPTIONS.map((option) => (
+          <option key={option.url} value={option.url}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   useEffect(() => {
     if (audiblePendingAlerts.length > 0) {
@@ -270,9 +318,12 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
         <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-semibold text-amber-900">SOS sound alerts are off.</p>
-            <Button variant="outline" size="sm" onClick={enableSoundAlerts}>
-              Enable SOS Sound Alerts
-            </Button>
+            <div className="grid gap-2 sm:flex sm:items-end">
+              {renderSoundPicker()}
+              <Button variant="outline" size="sm" onClick={enableSoundAlerts}>
+                Enable SOS Sound Alerts
+              </Button>
+            </div>
           </div>
         </div>
       );
@@ -298,6 +349,7 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:items-center">
+            <div className="text-white lg:min-w-48">{renderSoundPicker()}</div>
             {soundNeedsEnable && (
               <Button variant="secondary" size="sm" onClick={enableSoundAlerts}>
                 Enable SOS Sound Alerts
@@ -350,6 +402,7 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2">
+                <div className="sm:col-span-2">{renderSoundPicker()}</div>
                 {soundNeedsEnable && (
                   <Button variant="secondary" onClick={enableSoundAlerts}>
                     Enable SOS Sound Alerts

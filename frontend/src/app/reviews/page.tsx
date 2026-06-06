@@ -20,7 +20,7 @@ export default function ReviewsPage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const load = () => api<{ reviews: Review[] }>('/reviews/mine').then((d) => setReviews(d.reviews));
+  const load = () => api<{ reviews: Review[] }>('/reviews?scope=mine').then((d) => setReviews(d.reviews));
   useEffect(() => { load(); }, []);
 
   const submit = async (e: React.FormEvent) => {

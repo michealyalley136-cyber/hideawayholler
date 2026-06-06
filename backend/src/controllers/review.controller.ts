@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { ReviewStatus } from '@prisma/client';
+import { ReviewStatus, UserRole } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 
@@ -39,6 +39,19 @@ export async function adminReviews(_req: AuthRequest, res: Response) {
   res.json({ reviews: reviews.map(serializeReview) });
 }
 
+export async function listReviews(req: AuthRequest, res: Response) {
+  const scope = typeof req.query.scope === 'string' ? req.query.scope : 'mine';
+
+  if (scope === 'admin') {
+    if (req.user!.role !== UserRole.ADMIN) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    return adminReviews(req, res);
+  }
+
+  return myReviews(req, res);
+}
+
 export async function createReview(req: AuthRequest, res: Response) {
   const { rating, title, review } = req.body;
   const file = req.file;
@@ -57,10 +70,15 @@ export async function createReview(req: AuthRequest, res: Response) {
 }
 
 export async function updateReview(req: AuthRequest, res: Response) {
-  const { status, isFeatured } = req.body;
+  const { id, status, isFeatured } = req.body;
+  const reviewId = req.params.id || id;
+  if (!reviewId) {
+    return res.status(400).json({ error: 'Review id is required' });
+  }
+
   const reviewed = status === ReviewStatus.APPROVED || status === ReviewStatus.REJECTED;
   const review = await prisma.residentReview.update({
-    where: { id: req.params.id },
+    where: { id: reviewId },
     data: {
       status,
       isFeatured: Boolean(isFeatured),

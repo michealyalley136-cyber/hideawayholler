@@ -24,7 +24,7 @@ export function clearAuth() {
 export function getDashboardPath(role: UserRole): string {
   switch (role) {
     case 'ADMIN':
-      return '/admin';
+      return '/admin/dashboard';
     case 'ALUMNI':
       return '/alumni';
     case 'RESIDENT':

@@ -8,7 +8,13 @@ export interface JwtPayload {
 }
 
 const secret = process.env.JWT_SECRET || 'dev-secret';
-const expiresIn = (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
+
+function normalizeExpiresIn(value: string | undefined): jwt.SignOptions['expiresIn'] {
+  const normalized = (value || '7d').trim().replace(/^['"]|['"]$/g, '');
+  return (normalized || '7d') as jwt.SignOptions['expiresIn'];
+}
+
+const expiresIn = normalizeExpiresIn(process.env.JWT_EXPIRES_IN);
 
 export function signToken(payload: JwtPayload): string {
   return jwt.sign(payload, secret as jwt.Secret, { expiresIn });

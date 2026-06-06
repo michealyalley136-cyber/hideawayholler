@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { getDashboardPath } from '@/lib/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
@@ -26,7 +25,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace(getDashboardPath(user.role));
+      router.replace('/dashboard');
     }
   }, [user, router]);
 
@@ -43,7 +42,7 @@ export default function RegisterPage() {
       });
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     if (form.password.length < 8) {

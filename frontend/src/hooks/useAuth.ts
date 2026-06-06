@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { getStoredUser, setAuth, setStoredUser, clearAuth, getDashboardPath } from '@/lib/auth';
+import { getStoredToken, getStoredUser, setAuth, setStoredUser, clearAuth } from '@/lib/auth';
 import { User } from '@/lib/types';
 
 export function useAuth(required = false) {
@@ -57,20 +57,16 @@ export function useAuth(required = false) {
     setAuth(data.token, data.user, rememberMe);
     const storedToken = getStoredToken();
     const storedUser = getStoredUser();
-    const redirectPath = getDashboardPath(data.user.role);
 
     if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
       console.debug('[auth] login success; token saved', { userId: data.user?.id, hasToken: Boolean(storedToken), hasUser: Boolean(storedUser) });
-      console.debug('[auth] redirecting to', redirectPath);
     }
 
     setUser(data.user);
-    router.push(redirectPath);
 
     return {
       status: 200,
       role: data.user.role,
-      redirectPath,
       hasToken: Boolean(storedToken),
       hasUser: Boolean(storedUser),
     };
@@ -87,7 +83,7 @@ export function useAuth(required = false) {
     });
     setAuth(data.token, data.user, rememberMe);
     setUser(data.user);
-    router.push(redirectTo || getDashboardPath(data.user.role));
+    router.push(redirectTo || '/dashboard');
   };
 
   const logout = () => {

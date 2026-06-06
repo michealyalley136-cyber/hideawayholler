@@ -2,14 +2,14 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getDashboardPath, getStoredUser } from '@/lib/auth';
+import { getStoredUser } from '@/lib/auth';
 
 export default function PortalPage() {
   const router = useRouter();
 
   useEffect(() => {
     const user = getStoredUser();
-    router.replace(user ? getDashboardPath(user.role) : '/login');
+    router.replace(user ? '/dashboard' : '/login');
   }, [router]);
 
   return (

@@ -1,11 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { getDashboardPath } from '@/lib/auth';
-import { apiHealth, apiUrl } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
@@ -23,81 +21,47 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [healthStatus, setHealthStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-  const [healthStatusCode, setHealthStatusCode] = useState<number | null>(null);
-  const [healthMessage, setHealthMessage] = useState('Checking backend health...');
-  const [loginAttempted, setLoginAttempted] = useState(false);
-  const [loginResponseStatus, setLoginResponseStatus] = useState<number | null>(null);
+  const [loginClicked, setLoginClicked] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState<'yes' | 'no' | 'pending'>('pending');
+  const [tokenSaved, setTokenSaved] = useState<'yes' | 'no' | 'pending'>('pending');
   const [debugLines, setDebugLines] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
-      router.replace(getDashboardPath(user.role));
+      router.replace('/dashboard');
     }
   }, [user, router]);
 
-  useEffect(() => {
-    const healthUrl = apiUrl ? `${apiUrl}/health` : '(not configured)';
-    if (!apiUrl) {
-      setHealthStatus('offline');
-      setHealthStatusCode(0);
-      setHealthMessage('NEXT_PUBLIC_API_URL is not configured. Login still allowed.');
-      appendDebugLine('NEXT_PUBLIC_API_URL configured: no');
-      appendDebugLine(`Health URL being checked: ${healthUrl}`);
-      appendDebugLine('Health status code: 0');
-      return;
-    }
+  const appendDebugLine = (message: string) => {
+    setDebugLines((prev) => [...prev, message]);
+  };
 
-    appendDebugLine('NEXT_PUBLIC_API_URL configured: yes');
-    appendDebugLine(`Health URL being checked: ${healthUrl}`);
-
-    apiHealth()
-      .then(() => {
-        setHealthStatus('online');
-        setHealthStatusCode(200);
-        setHealthMessage('Backend health OK.');
-        appendDebugLine('Health status code: 200');
-      })
-      .catch((err) => {
-        const status = err && typeof err === 'object' && 'status' in err ? (err as any).status || 0 : 0;
-        setHealthStatus('offline');
-        setHealthStatusCode(status);
-        setHealthMessage('Backend health check failed, login still allowed.');
-        appendDebugLine(`Health status code: ${status}`);
-      });
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    setLoginAttempted(true);
-    setLoginResponseStatus(null);
+    setLoginClicked(true);
+    setLoginSuccess('pending');
+    setTokenSaved('pending');
     setDebugLines([]);
 
-    appendDebugLine('Login request attempted: yes');
-    appendDebugLine('Login request sent');
+    appendDebugLine('Login clicked');
+    appendDebugLine('API request sent');
 
     try {
       const result = await login(email, password, rememberMe);
 
-      setLoginResponseStatus(result.status);
-      appendDebugLine(`Login response status: ${result.status}`);
-      appendDebugLine(`Token received: ${result.hasToken ? 'yes' : 'no'}`);
-      appendDebugLine(`User role received: ${result.role}`);
-      appendDebugLine(`Redirect path selected: ${result.redirectPath}`);
-      appendDebugLine('Redirect attempted');
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.debug('[login] submit complete', {
-          role: result.role,
-          redirectPath: result.redirectPath,
-          hasToken: result.hasToken,
-          hasUser: result.hasUser,
-        });
-      }
+      setLoginSuccess('yes');
+      setTokenSaved(result.hasToken ? 'yes' : 'no');
+      appendDebugLine(`Login success: yes`);
+      appendDebugLine(`Token saved: ${result.hasToken ? 'yes' : 'no'}`);
+      appendDebugLine('Redirecting to /dashboard');
+      router.replace('/dashboard');
     } catch (err) {
+      setLoginSuccess('no');
       setError(err instanceof Error ? err.message : 'Login failed');
+      appendDebugLine(`Login success: no`);
+      appendDebugLine(`Token saved: no`);
       appendDebugLine(`Login failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       setLoading(false);
@@ -152,13 +116,11 @@ export default function LoginPage() {
           </form>
           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
             <p className="font-semibold text-slate-800">Login debug</p>
-            <p className="text-xs text-slate-500">NEXT_PUBLIC_API_URL configured: {apiUrl ? 'yes' : 'no'}</p>
-            <p className="text-xs text-slate-500">Health URL being checked: {apiUrl ? `${apiUrl}/health` : '(not configured)'}</p>
-            <p className="text-xs text-slate-500">Health status: {healthStatus}</p>
-            <p className="text-xs text-slate-500">Health status code: {healthStatusCode ?? 'n/a'}</p>
-            <p className="text-xs text-slate-500">Health message: {healthMessage}</p>
-            <p className="text-xs text-slate-500">Login request attempted: {loginAttempted ? 'yes' : 'no'}</p>
-            <p className="text-xs text-slate-500">Login response status: {loginResponseStatus ?? 'n/a'}</p>
+            <p className="text-xs text-slate-500">Login clicked: {loginClicked ? 'yes' : 'no'}</p>
+            <p className="text-xs text-slate-500">API request sent: {loginClicked ? 'yes' : 'no'}</p>
+            <p className="text-xs text-slate-500">Login success: {loginSuccess}</p>
+            <p className="text-xs text-slate-500">Token saved: {tokenSaved}</p>
+            <p className="text-xs text-slate-500">Redirecting to /dashboard</p>
           </div>
           {debugLines.length > 0 && (
             <div className="mt-4 space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">

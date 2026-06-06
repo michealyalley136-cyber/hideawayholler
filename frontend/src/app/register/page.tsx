@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { getDashboardPath } from '@/lib/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
@@ -13,11 +15,19 @@ function checkBackendHealth() {
 }
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const router = useRouter();
+  const { user, register } = useAuth();
   const [form, setForm] = useState({ email: '', password: '', fullName: '', phone: '', country: '' });
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      router.replace(getDashboardPath(user.role));
+    }
+  }, [user, router]);
 
   useEffect(() => {
     checkBackendHealth()
@@ -39,7 +49,7 @@ export default function RegisterPage() {
     try {
       await checkBackendHealth();
       const redirectTo = new URLSearchParams(window.location.search).get('next') || undefined;
-      await register(form, redirectTo);
+      await register(form, redirectTo, rememberMe);
     } catch (err) {
       console.error('[register] Account creation failed', err);
       if (err instanceof ApiError) {
@@ -70,6 +80,15 @@ export default function RegisterPage() {
             <Input label="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
             <Input label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             <Input label="Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              Stay signed in
+            </label>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" className="w-full" loading={loading}>
               Create account

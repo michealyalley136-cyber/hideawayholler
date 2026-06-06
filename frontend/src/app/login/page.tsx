@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { getDashboardPath } from '@/lib/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
@@ -13,18 +15,26 @@ const demoAccounts = [
 ];
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      router.replace(getDashboardPath(user.role));
+    }
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -64,6 +74,15 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              Stay signed in
+            </label>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" className="w-full" loading={loading}>
               Sign in

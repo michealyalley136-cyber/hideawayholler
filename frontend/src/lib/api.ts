@@ -14,6 +14,8 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
   });
 }
 
+import { clearAuth, getStoredToken } from './auth';
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) {
     super(message);
@@ -22,7 +24,7 @@ export class ApiError extends Error {
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
+  return getStoredToken();
 }
 
 function apiPath(path: string) {
@@ -111,13 +113,13 @@ export async function api<T>(
     const isAuthRequest = path === '/auth/login' || path === '/auth/register';
     if (typeof window !== 'undefined' && !isAuthRequest) {
       if (res.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        clearAuth();
         window.location.assign('/login');
         return new Promise<T>(() => {});
       }
 
       if (res.status === 403) {
+        clearAuth();
         window.location.assign('/portal');
         return new Promise<T>(() => {});
       }

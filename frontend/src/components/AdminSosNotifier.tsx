@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AlertTriangle, MapPin, Phone, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { api, apiUrl } from '@/lib/api';
+import { getStoredToken } from '@/lib/auth';
 import { SosAlert } from '@/lib/types';
 
 interface AdminSosNotifierProps {
@@ -141,9 +142,7 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
 
   const pollActiveAlerts = useCallback(async () => {
     console.info('[sos admin] Polling active SOS alerts');
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (!token) return;
-
+    const token = getStoredToken();
     const res = await fetch(`${apiUrl}/admin/sos/active`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { api, apiUrl } from '@/lib/api';
+import { getStoredToken } from '@/lib/auth';
 import { SosAlert, SosAlertStatus } from '@/lib/types';
 
 const ACTIVE_STATUSES: SosAlertStatus[] = ['ACTIVE', 'ACKNOWLEDGED', 'NEEDS_HELP'];
@@ -41,7 +42,7 @@ export default function AdminSosCenter() {
 
   const loadAlerts = useCallback(async () => {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token = getStoredToken();
       if (!token) return;
 
       const res = await fetch(`${apiUrl}/admin/sos/active`, {

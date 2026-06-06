@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { getStoredUser, setAuth, clearAuth, getDashboardPath } from '@/lib/auth';
+import { getStoredUser, setAuth, setStoredUser, clearAuth, getDashboardPath } from '@/lib/auth';
 import { User } from '@/lib/types';
 
 export function useAuth(required = false) {
@@ -15,7 +15,7 @@ export function useAuth(required = false) {
     try {
       const data = await api<{ user: User }>('/auth/me');
       setUser(data.user);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      setStoredUser(data.user);
     } catch {
       clearAuth();
       setUser(null);
@@ -36,25 +36,26 @@ export function useAuth(required = false) {
     refresh();
   }, [required, refresh, router]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, rememberMe = true) => {
     const data = await api<{ token: string; user: User }>('/auth/login', {
       method: 'POST',
       body: { email, password },
     });
-    setAuth(data.token, data.user);
+    setAuth(data.token, data.user, rememberMe);
     setUser(data.user);
     router.push(getDashboardPath(data.user.role));
   };
 
   const register = async (
     payload: { email: string; password: string; fullName: string; phone?: string; country?: string },
-    redirectTo?: string
+    redirectTo?: string,
+    rememberMe = true
   ) => {
     const data = await api<{ token: string; user: User }>('/auth/register', {
       method: 'POST',
       body: payload,
     });
-    setAuth(data.token, data.user);
+    setAuth(data.token, data.user, rememberMe);
     setUser(data.user);
     router.push(redirectTo || getDashboardPath(data.user.role));
   };

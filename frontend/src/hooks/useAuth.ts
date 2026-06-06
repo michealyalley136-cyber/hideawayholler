@@ -16,10 +16,14 @@ export function useAuth(required = false) {
       const data = await api<{ user: User }>('/auth/me');
       setUser(data.user);
       setStoredUser(data.user);
-    } catch {
+    } catch (err) {
       clearAuth();
       setUser(null);
-      if (required) router.push('/login');
+      // If required, only redirect to login for non-network errors.
+      // Network errors (status 0) should not immediately kick the user back to login
+      // to avoid redirect loops when the backend is temporarily unreachable.
+      const status = err && typeof err === 'object' && 'status' in (err as any) ? (err as any).status : undefined;
+      if (required && status !== 0) router.push('/login');
     } finally {
       setLoading(false);
     }
@@ -37,11 +41,27 @@ export function useAuth(required = false) {
   }, [required, refresh, router]);
 
   const login = async (email: string, password: string, rememberMe = true) => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.debug('[auth] login submit started', { email });
+    }
+
     const data = await api<{ token: string; user: User }>('/auth/login', {
       method: 'POST',
       body: { email, password },
     });
+
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.debug('[auth] login API response received', { userId: data.user?.id, role: data.user?.role });
+    }
+
+    // Save auth before navigating.
     setAuth(data.token, data.user, rememberMe);
+
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.debug('[auth] login success; token saved', { userId: data.user?.id });
+      console.debug('[auth] redirecting to', getDashboardPath(data.user.role));
+    }
+
     setUser(data.user);
     router.push(getDashboardPath(data.user.role));
   };

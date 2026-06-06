@@ -93,6 +93,10 @@ export async function api<T>(
       },
       body: isFormData ? body : body ? JSON.stringify(body) : undefined,
     });
+
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.debug('[api] response received', { url, method: rest.method || 'GET', status: res.status });
+    }
   } catch (err) {
     if (!suppressErrorLog) {
       console.error('[api] Network error', { url, method: rest.method || 'GET', err });

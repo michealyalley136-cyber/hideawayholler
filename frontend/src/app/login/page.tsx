@@ -33,8 +33,16 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[login] submit started', { email, rememberMe });
+    }
+
     try {
       await login(email, password, rememberMe);
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[login] login() resolved');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

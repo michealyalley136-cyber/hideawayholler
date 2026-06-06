@@ -52,7 +52,16 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await checkBackendHealth();
+      // Attempt a health check but do not block registration on failure —
+      // show a warning and proceed to create the account.
+      checkBackendHealth().then(() => {
+        setApiStatus('online');
+        setApiError(null);
+      }).catch((err) => {
+        console.warn('[register] backend health check failed, proceeding with registration', err);
+        setApiStatus('offline');
+        setApiError(err instanceof Error ? err.message : String(err));
+      });
       const redirectTo = new URLSearchParams(window.location.search).get('next') || undefined;
       await register(form, redirectTo, rememberMe);
     } catch (err) {

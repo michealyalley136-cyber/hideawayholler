@@ -57,9 +57,7 @@ export async function apiHealth() {
   }
 
   try {
-    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-      console.info('[apiHealth] Checking backend health at', healthUrl);
-    }
+    console.info('[apiHealth] Checking backend health at', healthUrl);
     const res = await fetch(healthUrl, { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {

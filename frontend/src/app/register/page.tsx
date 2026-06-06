@@ -37,9 +37,9 @@ export default function RegisterPage() {
         setApiError(null);
       })
       .catch((err) => {
-        console.error('[register] /api/health failed', err);
+        console.warn('[register] /api/health failed', err);
         setApiStatus('offline');
-        setApiError(err instanceof Error ? err.message : String(err));
+        setApiError('Health check failed; registration will still proceed.');
       });
   }, []);
 
@@ -60,7 +60,7 @@ export default function RegisterPage() {
       }).catch((err) => {
         console.warn('[register] backend health check failed, proceeding with registration', err);
         setApiStatus('offline');
-        setApiError(err instanceof Error ? err.message : String(err));
+        setApiError('Health check failed; registration will still proceed.');
       });
       const redirectTo = new URLSearchParams(window.location.search).get('next') || undefined;
       await register(form, redirectTo, rememberMe);
@@ -82,10 +82,10 @@ export default function RegisterPage() {
         <CardBody>
           <h1 className="text-2xl font-bold text-slate-900">Apply for housing</h1>
           <p className="text-sm text-slate-500 mt-1">Create your HollerHub applicant account</p>
-          <p className={apiStatus === 'offline' ? 'mt-3 text-sm text-red-600' : 'mt-3 text-xs text-slate-400'}>
-            {apiStatus === 'checking' && 'Checking backend connection...'}
-            {apiStatus === 'online' && 'Backend connection ready.'}
-            {apiStatus === 'offline' && (apiError || 'Backend is not reachable. Confirm NEXT_PUBLIC_API_URL points to the deployed backend API, or start the API on http://localhost:5000 for local development.')}
+          <p className={apiStatus === 'offline' ? 'mt-3 text-sm text-amber-700' : 'mt-3 text-xs text-slate-400'}>
+            {apiStatus === 'checking' && 'Checking backend health...'}
+            {apiStatus === 'online' && 'Backend health is OK.'}
+            {apiStatus === 'offline' && (apiError || 'Health check failed. Registration will proceed.')}
           </p>
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <Input label="Full name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required />

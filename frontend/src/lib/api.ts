@@ -42,10 +42,10 @@ function errorMessageForNetworkFailure() {
   }
 
   if (apiOrigin === localApiUrl) {
-    return `Unable to reach the HollerHub API at ${apiOrigin}. Confirm the backend is running on ${localApiUrl}.`;
+    return `Unable to reach the backend health endpoint at ${apiOrigin}. Confirm the backend is running on ${localApiUrl}.`;
   }
 
-  return `Unable to reach the HollerHub API at ${apiOrigin}. Confirm the backend is deployed and NEXT_PUBLIC_API_URL is correct.`;
+  return `Unable to reach the backend health endpoint at ${apiOrigin}. Confirm the backend is deployed and NEXT_PUBLIC_API_URL is correct.`;
 }
 
 export async function apiHealth() {
@@ -68,7 +68,7 @@ export async function apiHealth() {
   } catch (err) {
     if (err instanceof ApiError) throw err;
     console.error('[apiHealth] Backend health check network error', { url: healthUrl, err });
-    throw new ApiError(0, `Unable to reach the HollerHub API at ${healthUrl}. Confirm the backend is running and NEXT_PUBLIC_API_URL is correct.`, err);
+    throw new ApiError(0, `Unable to reach the backend health endpoint at ${healthUrl}. Confirm NEXT_PUBLIC_API_URL is correct.`, err);
   }
 }
 

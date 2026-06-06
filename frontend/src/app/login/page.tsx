@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { getDashboardPath } from '@/lib/auth';
+import { apiHealth, apiUrl } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
@@ -22,6 +23,11 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [healthStatusCode, setHealthStatusCode] = useState<number | null>(null);
+  const [healthMessage, setHealthMessage] = useState('Checking backend health...');
+  const [loginAttempted, setLoginAttempted] = useState(false);
+  const [loginResponseStatus, setLoginResponseStatus] = useState<number | null>(null);
   const [debugLines, setDebugLines] = useState<string[]>([]);
 
   useEffect(() => {
@@ -30,21 +36,52 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
-  const appendDebugLine = (line: string) => {
-    setDebugLines((prev) => [...prev.slice(-7), line]);
-  };
+  useEffect(() => {
+    const healthUrl = apiUrl ? `${apiUrl}/health` : '(not configured)';
+    if (!apiUrl) {
+      setHealthStatus('offline');
+      setHealthStatusCode(0);
+      setHealthMessage('NEXT_PUBLIC_API_URL is not configured. Login still allowed.');
+      appendDebugLine('NEXT_PUBLIC_API_URL configured: no');
+      appendDebugLine(`Health URL being checked: ${healthUrl}`);
+      appendDebugLine('Health status code: 0');
+      return;
+    }
+
+    appendDebugLine('NEXT_PUBLIC_API_URL configured: yes');
+    appendDebugLine(`Health URL being checked: ${healthUrl}`);
+
+    apiHealth()
+      .then(() => {
+        setHealthStatus('online');
+        setHealthStatusCode(200);
+        setHealthMessage('Backend health OK.');
+        appendDebugLine('Health status code: 200');
+      })
+      .catch((err) => {
+        const status = err && typeof err === 'object' && 'status' in err ? (err as any).status || 0 : 0;
+        setHealthStatus('offline');
+        setHealthStatusCode(status);
+        setHealthMessage('Backend health check failed, login still allowed.');
+        appendDebugLine(`Health status code: ${status}`);
+      });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    setLoginAttempted(true);
+    setLoginResponseStatus(null);
     setDebugLines([]);
 
+    appendDebugLine('Login request attempted: yes');
     appendDebugLine('Login request sent');
 
     try {
       const result = await login(email, password, rememberMe);
 
+      setLoginResponseStatus(result.status);
       appendDebugLine(`Login response status: ${result.status}`);
       appendDebugLine(`Token received: ${result.hasToken ? 'yes' : 'no'}`);
       appendDebugLine(`User role received: ${result.role}`);
@@ -113,6 +150,16 @@ export default function LoginPage() {
               Sign in
             </Button>
           </form>
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <p className="font-semibold text-slate-800">Login debug</p>
+            <p className="text-xs text-slate-500">NEXT_PUBLIC_API_URL configured: {apiUrl ? 'yes' : 'no'}</p>
+            <p className="text-xs text-slate-500">Health URL being checked: {apiUrl ? `${apiUrl}/health` : '(not configured)'}</p>
+            <p className="text-xs text-slate-500">Health status: {healthStatus}</p>
+            <p className="text-xs text-slate-500">Health status code: {healthStatusCode ?? 'n/a'}</p>
+            <p className="text-xs text-slate-500">Health message: {healthMessage}</p>
+            <p className="text-xs text-slate-500">Login request attempted: {loginAttempted ? 'yes' : 'no'}</p>
+            <p className="text-xs text-slate-500">Login response status: {loginResponseStatus ?? 'n/a'}</p>
+          </div>
           {debugLines.length > 0 && (
             <div className="mt-4 space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
               {debugLines.map((line, index) => (

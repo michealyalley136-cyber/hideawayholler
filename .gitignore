@@ -11,3 +11,6 @@ frontend/build-*.txt
 frontend/install-output.txt
 frontend/npm-next-install-log.txt
 .DS_Store
+.agents/
+notifications/
+skills-lock.json

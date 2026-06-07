@@ -6,6 +6,7 @@ import {
   BusinessPaymentStatus,
   BusinessSetupFeeStatus,
   ClientBillingSettings,
+  ClientSubscriptionStatus,
   UserRole,
 } from '@prisma/client';
 import { prisma } from '../utils/prisma';
@@ -103,6 +104,11 @@ export async function markInvoicePaid(input: {
       }),
     ]);
   }
+
+  await prisma.clientBillingSettings.updateMany({
+    where: { clientId: input.accountId },
+    data: { subscriptionStatus: ClientSubscriptionStatus.ACTIVE },
+  });
 
   await logAuditEvent({
     actorId: input.actorId,

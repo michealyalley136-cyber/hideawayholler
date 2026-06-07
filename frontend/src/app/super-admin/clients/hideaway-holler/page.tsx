@@ -31,7 +31,6 @@ interface BillingSettings {
   nextBillingDate?: string | null;
   paymentDueDay: number;
   gracePeriodDays: number;
-  subscriptionStatus: string;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   notes?: string | null;
@@ -212,6 +211,16 @@ function toDateInput(value?: string | null) {
   return new Date(value).toISOString().slice(0, 10);
 }
 
+function addBillingInterval(dateValue: string, frequency: string) {
+  if (!dateValue) return '';
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
+  if (frequency === 'QUARTERLY') date.setMonth(date.getMonth() + 3);
+  else if (frequency === 'YEARLY') date.setFullYear(date.getFullYear() + 1);
+  else date.setMonth(date.getMonth() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
 function StatCard({ title, value, icon: Icon, accent = 'text-brand-700 bg-brand-50' }: { title: string; value: string | number; icon: any; accent?: string }) {
   return (
     <Card>
@@ -233,14 +242,13 @@ function StatCard({ title, value, icon: Icon, accent = 'text-brand-700 bg-brand-
 const defaultBillingForm = {
   businessName: 'Hideaway Holler',
   billingEmail: '',
-  setupFeeAmount: 0,
-  monthlySubscriptionAmount: 0,
+  setupFeeAmount: '',
+  monthlySubscriptionAmount: '',
   billingFrequency: 'MONTHLY',
   billingStartDate: '',
   nextBillingDate: '',
   paymentDueDay: 1,
   gracePeriodDays: 7,
-  subscriptionStatus: 'INCOMPLETE',
   stripeCustomerId: '',
   stripeSubscriptionId: '',
   notes: '',
@@ -251,7 +259,7 @@ export default function HideawayHollerClientPage() {
   const [billingForm, setBillingForm] = useState(defaultBillingForm);
   const [invoiceForm, setInvoiceForm] = useState({
     invoiceType: 'MONTHLY_SUBSCRIPTION',
-    amount: 0,
+    amount: '',
     dueDate: '',
     description: '',
     sendToClient: false,
@@ -266,14 +274,13 @@ export default function HideawayHollerClientPage() {
     setBillingForm({
       businessName: response.client.name || 'Hideaway Holler',
       billingEmail: response.client.billingEmail || '',
-      setupFeeAmount: settings?.setupFeeAmountDollars ?? centsToDollars(response.dashboardCards.setupFeeAmount),
-      monthlySubscriptionAmount: settings?.monthlySubscriptionAmountDollars ?? centsToDollars(settings?.monthlySubscriptionAmount),
+      setupFeeAmount: String((settings?.setupFeeAmountDollars ?? centsToDollars(response.dashboardCards.setupFeeAmount)) || ''),
+      monthlySubscriptionAmount: String((settings?.monthlySubscriptionAmountDollars ?? centsToDollars(settings?.monthlySubscriptionAmount)) || ''),
       billingFrequency: settings?.billingFrequency || 'MONTHLY',
       billingStartDate: toDateInput(settings?.billingStartDate),
       nextBillingDate: toDateInput(settings?.nextBillingDate || response.dashboardCards.nextBillingDate),
       paymentDueDay: settings?.paymentDueDay || 1,
       gracePeriodDays: settings?.gracePeriodDays ?? 7,
-      subscriptionStatus: settings?.subscriptionStatus || response.dashboardCards.subscriptionStatus || 'INCOMPLETE',
       stripeCustomerId: settings?.stripeCustomerId || response.client.stripeCustomerId || '',
       stripeSubscriptionId: settings?.stripeSubscriptionId || '',
       notes: settings?.notes || '',
@@ -318,7 +325,11 @@ export default function HideawayHollerClientPage() {
     await runAction('save-billing', async () => {
       await api('/business-billing/super-admin/billing-settings', {
         method: 'PATCH',
-        body: billingForm,
+        body: {
+          ...billingForm,
+          setupFeeAmount: Number(billingForm.setupFeeAmount || 0),
+          monthlySubscriptionAmount: Number(billingForm.monthlySubscriptionAmount || 0),
+        },
       });
     }, 'Billing settings saved.');
   };
@@ -334,9 +345,9 @@ export default function HideawayHollerClientPage() {
     await runAction('create-invoice', async () => {
       await api('/business-billing/super-admin/invoices', {
         method: 'POST',
-        body: invoiceForm,
+        body: { ...invoiceForm, amount: Number(invoiceForm.amount || 0) },
       });
-      setInvoiceForm({ invoiceType: 'MONTHLY_SUBSCRIPTION', amount: 0, dueDate: '', description: '', sendToClient: false });
+      setInvoiceForm({ invoiceType: 'MONTHLY_SUBSCRIPTION', amount: '', dueDate: '', description: '', sendToClient: false });
     }, 'Invoice created.');
   };
 
@@ -446,20 +457,43 @@ export default function HideawayHollerClientPage() {
                     <input type="email" value={billingForm.billingEmail} onChange={(e) => setBillingForm({ ...billingForm, billingEmail: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                   </Field>
                   <Field label="Setup Fee Amount ($)">
-                    <input type="number" min={0} step={0.01} value={billingForm.setupFeeAmount} onChange={(e) => setBillingForm({ ...billingForm, setupFeeAmount: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                    <input type="number" min={0} step={0.01} value={billingForm.setupFeeAmount} onChange={(e) => setBillingForm({ ...billingForm, setupFeeAmount: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="0.00" />
                   </Field>
                   <Field label="Monthly Subscription Amount ($)">
-                    <input type="number" min={0} step={0.01} value={billingForm.monthlySubscriptionAmount} onChange={(e) => setBillingForm({ ...billingForm, monthlySubscriptionAmount: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                    <input type="number" min={0} step={0.01} value={billingForm.monthlySubscriptionAmount} onChange={(e) => setBillingForm({ ...billingForm, monthlySubscriptionAmount: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="0.00" />
                   </Field>
                   <Field label="Billing Frequency">
-                    <select value={billingForm.billingFrequency} onChange={(e) => setBillingForm({ ...billingForm, billingFrequency: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <select
+                      value={billingForm.billingFrequency}
+                      onChange={(e) => {
+                        const billingFrequency = e.target.value;
+                        setBillingForm({
+                          ...billingForm,
+                          billingFrequency,
+                          nextBillingDate: billingForm.billingStartDate ? addBillingInterval(billingForm.billingStartDate, billingFrequency) : billingForm.nextBillingDate,
+                        });
+                      }}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    >
                       <option value="MONTHLY">Monthly</option>
                       <option value="QUARTERLY">Quarterly</option>
                       <option value="YEARLY">Yearly</option>
                     </select>
                   </Field>
                   <Field label="Billing Start Date">
-                    <input type="date" value={billingForm.billingStartDate} onChange={(e) => setBillingForm({ ...billingForm, billingStartDate: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                    <input
+                      type="date"
+                      value={billingForm.billingStartDate}
+                      onChange={(e) => {
+                        const billingStartDate = e.target.value;
+                        setBillingForm({
+                          ...billingForm,
+                          billingStartDate,
+                          nextBillingDate: addBillingInterval(billingStartDate, billingForm.billingFrequency),
+                        });
+                      }}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    />
                   </Field>
                   <Field label="Next Billing Date">
                     <input type="date" value={billingForm.nextBillingDate} onChange={(e) => setBillingForm({ ...billingForm, nextBillingDate: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
@@ -469,16 +503,6 @@ export default function HideawayHollerClientPage() {
                   </Field>
                   <Field label="Grace Period Days">
                     <input type="number" min={0} value={billingForm.gracePeriodDays} onChange={(e) => setBillingForm({ ...billingForm, gracePeriodDays: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                  </Field>
-                  <Field label="Subscription Status">
-                    <select value={billingForm.subscriptionStatus} onChange={(e) => setBillingForm({ ...billingForm, subscriptionStatus: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                      <option value="TRIAL">Trial</option>
-                      <option value="ACTIVE">Active</option>
-                      <option value="PAST_DUE">Past Due</option>
-                      <option value="SUSPENDED">Suspended</option>
-                      <option value="CANCELLED">Cancelled</option>
-                      <option value="INCOMPLETE">Incomplete</option>
-                    </select>
                   </Field>
                   <Field label="Stripe Customer ID">
                     <input value={billingForm.stripeCustomerId} onChange={(e) => setBillingForm({ ...billingForm, stripeCustomerId: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
@@ -497,7 +521,7 @@ export default function HideawayHollerClientPage() {
                       Sync Stripe
                     </Button>
                   )}
-                  <Button type="button" variant="outline" onClick={generateSetupFeeInvoice} loading={actionLoading === 'setup-fee-invoice'} disabled={billingForm.setupFeeAmount <= 0}>
+                  <Button type="button" variant="outline" onClick={generateSetupFeeInvoice} loading={actionLoading === 'setup-fee-invoice'} disabled={Number(billingForm.setupFeeAmount || 0) <= 0}>
                     Generate Setup Fee Invoice
                   </Button>
                   <Button type="button" variant="outline" onClick={waiveSetupFee} loading={actionLoading === 'waive-setup-fee'}>
@@ -532,7 +556,7 @@ export default function HideawayHollerClientPage() {
                     </select>
                   </Field>
                   <Field label="Amount ($)">
-                    <input type="number" min={0.01} step={0.01} value={invoiceForm.amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                    <input type="number" min={0.01} step={0.01} value={invoiceForm.amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="0.00" required />
                   </Field>
                   <Field label="Due Date">
                     <input type="date" value={invoiceForm.dueDate} onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />

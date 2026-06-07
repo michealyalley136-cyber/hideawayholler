@@ -52,7 +52,7 @@ export async function saveClientBillingSettings(
     nextBillingDate?: string | null;
     paymentDueDay: number;
     gracePeriodDays: number;
-    subscriptionStatus: ClientSubscriptionStatus;
+    subscriptionStatus?: ClientSubscriptionStatus;
     stripeCustomerId?: string | null;
     stripeSubscriptionId?: string | null;
     notes?: string | null;
@@ -66,6 +66,9 @@ export async function saveClientBillingSettings(
     nextBillingDate = addBillingInterval(billingStartDate, input.billingFrequency);
   }
   const setupFeeStatus = input.setupFeeStatus || settings.setupFeeStatus || account.setupFeeStatus;
+  const subscriptionStatus =
+    input.subscriptionStatus ||
+    (account.isSuspended ? ClientSubscriptionStatus.SUSPENDED : settings.subscriptionStatus || ClientSubscriptionStatus.INCOMPLETE);
 
   const [updatedAccount, updatedSettings] = await prisma.$transaction([
     prisma.businessAccount.update({
@@ -89,7 +92,7 @@ export async function saveClientBillingSettings(
         nextBillingDate,
         paymentDueDay: input.paymentDueDay,
         gracePeriodDays: input.gracePeriodDays,
-        subscriptionStatus: input.subscriptionStatus,
+        subscriptionStatus,
         stripeCustomerId: input.stripeCustomerId ?? settings.stripeCustomerId,
         stripeSubscriptionId: input.stripeSubscriptionId ?? settings.stripeSubscriptionId,
         notes: input.notes ?? null,

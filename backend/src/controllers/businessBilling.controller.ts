@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { BusinessInvoiceStatus, BusinessPaymentMethod, BusinessPaymentStatus } from '@prisma/client';
+import { BusinessInvoiceStatus, BusinessPaymentMethod, BusinessPaymentStatus, ClientSubscriptionStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { logAuditEvent } from '../services/audit.service';
@@ -191,6 +191,10 @@ async function handleCheckoutSessionCompleted(session: any) {
           paymentMethod: BusinessPaymentMethod.STRIPE,
           paidAt: new Date(),
         },
+      });
+      await prisma.clientBillingSettings.updateMany({
+        where: { clientId: invoice.businessAccountId },
+        data: { subscriptionStatus: ClientSubscriptionStatus.ACTIVE },
       });
     }
   }

@@ -209,12 +209,13 @@ export async function getSuperAdminBillingControls(req: AuthRequest, res: Respon
 export async function getSuperAdminClientDashboard(req: AuthRequest, res: Response) {
   if (!requireBillingSuperAdmin(req, res)) return;
 
-  const account = await billingAccountWithHistory();
-  if (!account) return res.status(404).json({ error: 'Client account not found' });
+  try {
+    const account = await billingAccountWithHistory();
+    if (!account) return res.status(404).json({ error: 'Client account not found', code: 'CLIENT_ACCOUNT_NOT_FOUND' });
 
-  const activeSubscription = account.subscriptions[0] || null;
-  const monthStart = startOfMonth();
-  const yearStart = startOfYear();
+    const activeSubscription = account.subscriptions[0] || null;
+    const monthStart = startOfMonth();
+    const yearStart = startOfYear();
 
   const [
     totalPaid,
@@ -330,7 +331,7 @@ export async function getSuperAdminClientDashboard(req: AuthRequest, res: Respon
     failedNotifications,
   });
 
-  res.json({
+    return res.json({
     client: {
       id: account.id,
       slug: 'hideaway-holler',
@@ -424,7 +425,22 @@ export async function getSuperAdminClientDashboard(req: AuthRequest, res: Respon
       webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
       priceId: process.env.STRIPE_BUSINESS_SUBSCRIPTION_PRICE_ID ? 'configured' : 'missing',
     },
-  });
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[business-billing] Super admin client dashboard failed', {
+      userId: req.user?.userId,
+      errorName: err instanceof Error ? err.name : 'UnknownError',
+      errorMessage: message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : err instanceof Error ? err.stack : undefined,
+    });
+
+    return res.status(500).json({
+      error: 'Unable to load the Hideaway Holler client dashboard right now.',
+      code: 'SUPER_ADMIN_CLIENT_DASHBOARD_FAILED',
+      details: process.env.NODE_ENV === 'production' ? undefined : message,
+    });
+  }
 }
 
 export async function updateSuperAdminBusinessAccount(req: AuthRequest, res: Response) {

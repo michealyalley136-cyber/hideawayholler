@@ -56,39 +56,56 @@ export async function register(req: AuthRequest, res: Response) {
 export async function login(req: AuthRequest, res: Response) {
   const { email, password } = req.body;
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { profile: true },
-  });
+  try {
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: { profile: true },
+    });
 
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-    return res.status(401).json({ error: 'Invalid email or password' });
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+      return res.status(401).json({ error: 'Invalid email or password', code: 'INVALID_CREDENTIALS' });
+    }
+
+    await logAuditEvent({
+      actorId: user.id,
+      actorRole: user.role,
+      action: 'USER_LOGIN',
+      entityType: 'User',
+      entityId: user.id,
+      metadata: {
+        email: user.email,
+        role: user.role,
+      },
+    }).catch((err) => {
+      console.error('[auth] Failed to log login audit event', { userId: user.id, message: err instanceof Error ? err.message : 'Unknown error' });
+    });
+
+    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[auth] Login failed unexpectedly', {
+      email,
+      errorName: err instanceof Error ? err.name : 'UnknownError',
+      errorMessage: message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : err instanceof Error ? err.stack : undefined,
+    });
+
+    return res.status(500).json({
+      error: 'Unable to sign in right now. Please try again or contact support.',
+      code: 'AUTH_LOGIN_FAILED',
+      details: process.env.NODE_ENV === 'production' ? undefined : message,
+    });
   }
-
-  await logAuditEvent({
-    actorId: user.id,
-    actorRole: user.role,
-    action: 'USER_LOGIN',
-    entityType: 'User',
-    entityId: user.id,
-    metadata: {
-      email: user.email,
-      role: user.role,
-    },
-  }).catch((err) => {
-    console.error('[auth] Failed to log login audit event', { userId: user.id, message: err instanceof Error ? err.message : 'Unknown error' });
-  });
-
-  const token = signToken({ userId: user.id, email: user.email, role: user.role });
-  res.json({
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      profile: user.profile,
-    },
-  });
 }
 
 export async function me(req: AuthRequest, res: Response) {

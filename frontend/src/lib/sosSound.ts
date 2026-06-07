@@ -1,7 +1,8 @@
-const SOS_SIREN_SRC = '/sounds/sos-siren.mp3';
+const DEFAULT_SOS_SOUND_SRC = '/sounds/sos-siren.mp3';
 
 let sosAudio: HTMLAudioElement | null = null;
 let vibrationTimer: number | null = null;
+let sosSoundSrc = DEFAULT_SOS_SOUND_SRC;
 
 function canUseBrowserAudio() {
   return typeof window !== 'undefined' && typeof Audio !== 'undefined';
@@ -30,16 +31,33 @@ function stopVibration() {
 export function getSosAudio() {
   if (!canUseBrowserAudio()) return null;
   if (!sosAudio) {
-    sosAudio = new Audio(SOS_SIREN_SRC);
+    sosAudio = new Audio(sosSoundSrc);
     sosAudio.loop = true;
     sosAudio.volume = 1.0;
     sosAudio.preload = 'auto';
+  } else if (sosAudio.src && !sosAudio.src.endsWith(sosSoundSrc)) {
+    const wasPaused = sosAudio.paused;
+    sosAudio.pause();
+    sosAudio.src = sosSoundSrc;
+    sosAudio.load();
+    if (!wasPaused) void sosAudio.play().catch(() => undefined);
   }
 
   sosAudio.loop = true;
   sosAudio.volume = 1.0;
   sosAudio.preload = 'auto';
   return sosAudio;
+}
+
+export function setSosSoundSource(src?: string) {
+  const nextSrc = src || DEFAULT_SOS_SOUND_SRC;
+  if (nextSrc === sosSoundSrc) return;
+  sosSoundSrc = nextSrc;
+  if (sosAudio) {
+    sosAudio.pause();
+    sosAudio.src = sosSoundSrc;
+    sosAudio.load();
+  }
 }
 
 export async function unlockSosSound() {
@@ -57,11 +75,12 @@ export async function unlockSosSound() {
   }
 }
 
-export async function playSosSound() {
+export async function playSosSound(options: { loop?: boolean } = {}) {
   const audio = getSosAudio();
   if (!audio) return false;
 
   try {
+    audio.loop = options.loop ?? true;
     startVibration();
     await audio.play();
     return true;

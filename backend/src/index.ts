@@ -5,6 +5,7 @@ import path from 'path';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { ensureUploadDirs } from './utils/storage';
+import { stripeBusinessBillingWebhook } from './controllers/businessBilling.controller';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,6 +41,7 @@ ensureUploadDirs();
 
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
+app.post('/api/business-billing/webhook', express.raw({ type: 'application/json' }), stripeBusinessBillingWebhook);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve(UPLOAD_DIR)));

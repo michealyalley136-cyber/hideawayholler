@@ -101,7 +101,10 @@ export async function assignRoom(req: AuthRequest, res: Response) {
 }
 
 export async function getOccupancy(_req: AuthRequest, res: Response) {
-  const beds = await prisma.bed.count({ where: { isActive: true, room: { building: { name: { in: ANIMAL_HOUSES } } } } });
-  const occupied = await prisma.roomAssignment.count({ where: { vacatedAt: null, room: { building: { name: { in: ANIMAL_HOUSES } } } } });
-  res.json({ totalBeds: beds, occupied, vacant: beds - occupied });
+  const [capacity, occupied] = await Promise.all([
+    prisma.houseAssignment.aggregate({ where: { status: 'ACTIVE' }, _sum: { capacity: true } }),
+    prisma.residentHouseAssignment.count({ where: { vacatedAt: null, houseAssignment: { status: 'ACTIVE' } } }),
+  ]);
+  const totalBeds = capacity._sum.capacity || 0;
+  res.json({ totalBeds, occupied, vacant: totalBeds - occupied });
 }

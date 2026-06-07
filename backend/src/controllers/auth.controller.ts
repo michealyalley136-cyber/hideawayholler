@@ -5,6 +5,7 @@ import { UserRole } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { signToken } from '../utils/jwt';
 import { AuthRequest } from '../middleware/auth';
+import { logAuditEvent } from '../services/audit.service';
 
 export const registerValidation = [
   body('email').isEmail().normalizeEmail(),
@@ -63,6 +64,20 @@ export async function login(req: AuthRequest, res: Response) {
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
+
+  await logAuditEvent({
+    actorId: user.id,
+    actorRole: user.role,
+    action: 'USER_LOGIN',
+    entityType: 'User',
+    entityId: user.id,
+    metadata: {
+      email: user.email,
+      role: user.role,
+    },
+  }).catch((err) => {
+    console.error('[auth] Failed to log login audit event', { userId: user.id, message: err instanceof Error ? err.message : 'Unknown error' });
+  });
 
   const token = signToken({ userId: user.id, email: user.email, role: user.role });
   res.json({

@@ -1,5 +1,6 @@
 import { SosAlert, SosAlertStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
+import { getSosSettings } from './sosSettings.service';
 
 type WebPushSubscription = {
   endpoint: string;
@@ -77,6 +78,17 @@ async function logNotification(data: {
 }
 
 export async function sendSosPushNotifications(alert: Pick<SosAlert, 'id'>) {
+  const settings = await getSosSettings();
+  if (!settings.browserNotificationsEnabled) {
+    await logNotification({
+      sosAlertId: alert.id,
+      channel: 'PUSH',
+      status: 'SKIPPED',
+      message: 'Browser notifications are disabled in SOS settings.',
+    });
+    return;
+  }
+
   const emergencyAlert = await getOrCreateEmergencyAlert(alert.id);
   const devices = await prisma.adminDevice.findMany({
     where: { enabled: true },
@@ -210,19 +222,22 @@ async function sendSmsFallback(sosAlertId: string, phones: string[], stage: 'PRI
   );
 }
 
-export function scheduleSosFallbacks(sosAlertId: string) {
+export async function scheduleSosFallbacks(sosAlertId: string) {
   if (scheduledFallbacks.has(sosAlertId)) return;
   scheduledFallbacks.add(sosAlertId);
+  const settings = await getSosSettings();
+  const primaryDelay = Math.max(0, settings.escalation.smsFallbackAfterSeconds) * 1000;
+  const backupDelay = Math.max(primaryDelay, settings.escalation.backupAdminAfterSeconds * 1000);
 
   setTimeout(() => {
     void sendSmsFallback(sosAlertId, parsePhoneList(process.env.SOS_SMS_ADMIN_PHONES), 'PRIMARY');
-  }, 30_000);
+  }, primaryDelay);
 
   setTimeout(() => {
     void sendSmsFallback(sosAlertId, parsePhoneList(process.env.SOS_SMS_BACKUP_PHONES), 'BACKUP').finally(() => {
       scheduledFallbacks.delete(sosAlertId);
     });
-  }, 90_000);
+  }, backupDelay);
 }
 
 export async function markEmergencyAlertAcknowledged(sosAlertId: string) {

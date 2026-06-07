@@ -4,7 +4,11 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash('password123', 12);
+  const seedPassword = process.env.SEED_DEMO_PASSWORD;
+  if (!seedPassword) {
+    throw new Error('SEED_DEMO_PASSWORD is required to seed demo users.');
+  }
+  const passwordHash = await bcrypt.hash(seedPassword, 12);
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@hideawayholler.com' },
@@ -36,6 +40,43 @@ async function main() {
         create: {
           fullName: 'Holler Admin',
           phone: '+1-865-555-0100',
+          country: 'USA',
+          currentStatus: ResidentStatus.ACTIVE_RESIDENT,
+        },
+      },
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'superadmin@appcreativesllc.com' },
+    update: {
+      passwordHash,
+      role: UserRole.SUPER_ADMIN,
+      profile: {
+        upsert: {
+          create: {
+            fullName: 'AppCreatives Office',
+            phone: '+1-865-555-0200',
+            country: 'USA',
+            currentStatus: ResidentStatus.ACTIVE_RESIDENT,
+          },
+          update: {
+            fullName: 'AppCreatives Office',
+            phone: '+1-865-555-0200',
+            country: 'USA',
+            currentStatus: ResidentStatus.ACTIVE_RESIDENT,
+          },
+        },
+      },
+    },
+    create: {
+      email: 'superadmin@appcreativesllc.com',
+      passwordHash,
+      role: UserRole.SUPER_ADMIN,
+      profile: {
+        create: {
+          fullName: 'AppCreatives Office',
+          phone: '+1-865-555-0200',
           country: 'USA',
           currentStatus: ResidentStatus.ACTIVE_RESIDENT,
         },
@@ -371,10 +412,7 @@ async function main() {
   });
 
   console.log('Seed completed.');
-  console.log('Admin: admin@hideawayholler.com / password123');
-  console.log('Resident: maria@example.com / password123');
-  console.log('Applicant: juan@example.com / password123');
-  console.log('Alumni: anna@example.com / password123');
+  console.log('Seeded demo user emails. Passwords are configured through SEED_DEMO_PASSWORD.');
 }
 
 async function ensureAnimalHouses(propertyId: string) {

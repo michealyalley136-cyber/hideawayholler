@@ -11,14 +11,19 @@ import { ResidentProfile } from '@/lib/types';
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ResidentProfile | null>(null);
+  const [currentAssignment, setCurrentAssignment] = useState('');
   const [form, setForm] = useState<Partial<ResidentProfile>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    api<{ user: { profile: ResidentProfile } }>('/profiles').then((d) => {
+    api<{ user: { profile: ResidentProfile; residentHouseAssignments?: { houseAssignment?: { houseName: string } }[]; roomAssignments?: { room?: { roomNumber: string; building?: { name: string } } }[] } }>('/profiles').then((d) => {
       setProfile(d.user.profile);
       setForm(d.user.profile);
+      setCurrentAssignment(
+        d.user.residentHouseAssignments?.[0]?.houseAssignment?.houseName ||
+          (d.user.roomAssignments?.[0]?.room ? `Room ${d.user.roomAssignments[0].room.roomNumber}` : '')
+      );
     });
   }, []);
 
@@ -60,7 +65,10 @@ export default function ProfilePage() {
           {message && <span className="text-sm text-brand-600">{message}</span>}
         </div>
         {profile && (
-          <p className="mt-4 text-sm text-slate-500">Status: <span className="font-medium capitalize">{profile.currentStatus.replace(/_/g, ' ').toLowerCase()}</span></p>
+          <div className="mt-4 space-y-1 text-sm text-slate-500">
+            <p>Status: <span className="font-medium capitalize">{profile.currentStatus.replace(/_/g, ' ').toLowerCase()}</span></p>
+            <p>Current Assignment: <span className="font-medium text-slate-700">{currentAssignment || 'Not assigned'}</span></p>
+          </div>
         )}
       </AppShell>
     </ProtectedRoute>

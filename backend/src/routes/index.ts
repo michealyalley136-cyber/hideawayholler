@@ -19,6 +19,10 @@ import supplyRoutes from './supply.routes';
 import reviewRoutes from './review.routes';
 import sosRoutes from './sos.routes';
 import adminDeviceRoutes from './adminDevice.routes';
+import settingsRoutes from './settings.routes';
+import houseAssignmentRoutes from './houseAssignment.routes';
+import sosSettingsRoutes from './sosSettings.routes';
+import businessBillingRoutes from './businessBilling.routes';
 
 const router = Router();
 
@@ -46,5 +50,9 @@ router.use('/supply-requests', supplyRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/sos', sosRoutes);
 router.use('/admin-devices', adminDeviceRoutes);
+router.use('/settings', settingsRoutes);
+router.use('/sos-settings', sosSettingsRoutes);
+router.use('/house-assignments', houseAssignmentRoutes);
+router.use('/business-billing', businessBillingRoutes);
 
 export default router;

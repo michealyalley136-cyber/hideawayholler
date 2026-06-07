@@ -123,6 +123,12 @@ async function residentContext(userId: string) {
     where: { id: userId },
     include: {
       profile: true,
+      residentHouseAssignments: {
+        where: { vacatedAt: null },
+        include: { houseAssignment: true },
+        orderBy: { assignedAt: 'desc' },
+        take: 1,
+      },
       roomAssignments: {
         where: { vacatedAt: null },
         include: {
@@ -141,6 +147,7 @@ async function residentContext(userId: string) {
 
   if (!user) return null;
 
+  const houseAssignment = user.residentHouseAssignments[0]?.houseAssignment.houseName;
   const assignment = user.roomAssignments[0];
   const roomAssignment = assignment
     ? [
@@ -155,7 +162,7 @@ async function residentContext(userId: string) {
   return {
     residentName: user.profile?.fullName || user.email,
     phone: user.profile?.phone,
-    assignment: roomAssignment,
+    assignment: houseAssignment || roomAssignment,
   };
 }
 
@@ -287,7 +294,12 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
       message: err instanceof Error ? err.message : 'Unknown error',
     });
   });
-  scheduleSosFallbacks(alert.id);
+  void scheduleSosFallbacks(alert.id).catch((err) => {
+    console.warn('[sos resident] SOS fallback scheduling failed', {
+      sosAlertId: alert.id,
+      message: err instanceof Error ? err.message : 'Unknown error',
+    });
+  });
   res.status(201).json({ alert });
 }
 

@@ -6,7 +6,8 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
-import { getSosAudio, playSosSound, stopSosSound, unlockSosSound } from '@/lib/sosSound';
+import { DEFAULT_SOS_SETTINGS, SosSettings } from '@/lib/sosSettings';
+import { getSosAudio, playSosSound, setSosSoundSource, stopSosSound, unlockSosSound } from '@/lib/sosSound';
 import { SosAlert, SosAlertStatus } from '@/lib/types';
 
 const ACTIVE_STATUSES: SosAlertStatus[] = ['ACTIVE', 'ACKNOWLEDGED', 'NEEDS_HELP'];
@@ -85,6 +86,7 @@ function AdminSosConsole() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [soundBlocked, setSoundBlocked] = useState(false);
   const [soundStatus, setSoundStatus] = useState('Emergency sound is not armed on this device.');
+  const [settings, setSettings] = useState<SosSettings>(DEFAULT_SOS_SETTINGS);
   const [device, setDevice] = useState<AdminDevice | null>(null);
   const [pushStatus, setPushStatus] = useState('Push notifications are not enabled on this device.');
   const seenUnacknowledgedIdsRef = useRef<Set<string>>(new Set());
@@ -123,12 +125,23 @@ function AdminSosConsole() {
     }
   }, []);
 
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await api<{ settings: SosSettings }>('/sos-settings', { suppressErrorLog: true });
+      setSettings(res.settings);
+      setSosSoundSource(res.settings.sound.url);
+    } catch (err) {
+      console.warn('[admin-sos-pwa] Failed to load SOS settings', err);
+    }
+  }, []);
+
   useEffect(() => {
     loadAlerts();
     loadDevices();
+    loadSettings();
     const timer = setInterval(loadAlerts, 5000);
     return () => clearInterval(timer);
-  }, [loadAlerts, loadDevices]);
+  }, [loadAlerts, loadDevices, loadSettings]);
 
   useEffect(() => {
     document.title = activeAlerts.length > 0 ? `SOS ACTIVE (${activeAlerts.length})` : 'Hideaway Holler SOS';
@@ -144,7 +157,7 @@ function AdminSosConsole() {
     seenUnacknowledgedIdsRef.current = currentIds;
 
     if (soundEnabled && sirenAlerts.length > 0) {
-      void playSosSound().then((played) => {
+      void playSosSound({ loop: settings.continuousAlarmEnabled }).then((played) => {
         if (!played) {
           setSoundBlocked(true);
           setSoundStatus('Sound blocked - click Enable Emergency Sound after interacting with this page.');
@@ -159,7 +172,7 @@ function AdminSosConsole() {
     if (sirenAlerts.length === 0) {
       stopSosSound();
     }
-  }, [sirenAlerts, soundEnabled]);
+  }, [settings.continuousAlarmEnabled, sirenAlerts, soundEnabled]);
 
   const enableSound = async () => {
     const unlocked = await unlockSosSound();
@@ -184,7 +197,8 @@ function AdminSosConsole() {
   };
 
   const testSiren = async () => {
-    const played = await playSosSound();
+    setSosSoundSource(settings.sound.url);
+    const played = await playSosSound({ loop: false });
     if (!played) {
       setSoundBlocked(true);
       setSoundStatus('Sound cannot be played. Click Enable Emergency Sound and make sure device volume is up.');
@@ -195,7 +209,7 @@ function AdminSosConsole() {
     setSoundStatus('Testing siren for 3 seconds.');
     window.setTimeout(() => {
       if (soundEnabled && sirenAlerts.length > 0) {
-        void playSosSound();
+        void playSosSound({ loop: settings.continuousAlarmEnabled });
         setSoundStatus('Sound armed on this device');
         return;
       }
@@ -270,7 +284,7 @@ function AdminSosConsole() {
     const shouldPlay = UNACKNOWLEDGED_STATUSES.includes(alert.status) && !alert.adminAcknowledgedAt;
     if (!shouldPlay) return;
 
-    const played = await playSosSound();
+    const played = await playSosSound({ loop: settings.continuousAlarmEnabled });
     if (!played) {
       setSoundBlocked(true);
       setSoundStatus('Sound blocked - click Enable Emergency Sound after interacting with this page.');
@@ -280,7 +294,7 @@ function AdminSosConsole() {
         setSoundStatus('Siren is playing for the selected alert. Click Enable Emergency Sound to arm automatic playback.');
       }
     }
-  }, [soundEnabled]);
+  }, [settings.continuousAlarmEnabled, soundEnabled]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -350,7 +364,7 @@ function AdminSosConsole() {
           </div>
           <div className="mt-4 grid gap-2 text-sm text-red-100 md:grid-cols-2">
             <p>{pushStatus}</p>
-            <p>{soundBlocked ? soundStatus : soundEnabled ? 'Sound armed on this device' : soundStatus}</p>
+            <p>{soundBlocked ? soundStatus : soundEnabled ? `Sound armed on this device: ${settings.sound.label}` : soundStatus}</p>
           </div>
           <div className="mt-4 rounded-md border border-red-400/40 bg-red-900/40 p-3 text-sm font-semibold text-red-50">
             For emergency sound to work, keep this SOS app installed/opened recently, enable notifications, turn device volume up, and disable silent/focus mode during coverage hours.

@@ -6,22 +6,12 @@ import { AlertTriangle, MapPin, Phone, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { api, apiUrl } from '@/lib/api';
 import { getStoredToken } from '@/lib/auth';
+import { DEFAULT_SOS_SETTINGS, SosSettings } from '@/lib/sosSettings';
 import { SosAlert } from '@/lib/types';
 
 interface AdminSosNotifierProps {
   onCountChange?: (count: number) => void;
 }
-
-const SOS_SOUND_OPTIONS = [
-  { label: 'Default SOS Siren', url: '/sounds/sos-siren.mp3' },
-  { label: '11900601', url: '/sounds/11900601.mp3' },
-  { label: '49 20 Siren', url: '/sounds/49_20siren.mp3' },
-  { label: 'Danger Siren Alarm', url: '/sounds/danger-siren-alarm_BfknMds.mp3' },
-  { label: 'Police Sirens', url: '/sounds/police-sirens-10000006.mp3' },
-  { label: 'Siren DJ Sound Effect', url: '/sounds/siren-dj-sound-effect_m6o8Lt5.mp3' },
-];
-
-const DEFAULT_SOS_SOUND_URL = SOS_SOUND_OPTIONS[0].url;
 
 function formatDate(value?: string) {
   if (!value) return 'Not recorded';
@@ -50,7 +40,8 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
   const [actionId, setActionId] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [soundBlocked, setSoundBlocked] = useState(false);
-  const [selectedSoundUrl, setSelectedSoundUrl] = useState(DEFAULT_SOS_SOUND_URL);
+  const [settings, setSettings] = useState<SosSettings>(DEFAULT_SOS_SETTINGS);
+  const [selectedSoundUrl, setSelectedSoundUrl] = useState(DEFAULT_SOS_SETTINGS.sound.url);
   const [mutedAlertIds, setMutedAlertIds] = useState<Set<string>>(new Set());
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
@@ -109,12 +100,12 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
   }, []);
 
   const startSiren = useCallback(async () => {
-    if (!soundEnabled || sirenPlayingRef.current) return;
+    if (!soundEnabled || (settings.continuousAlarmEnabled && sirenPlayingRef.current)) return;
     const audio = sirenAudioRef.current;
     if (!audio) return;
 
     try {
-      audio.loop = true;
+      audio.loop = settings.continuousAlarmEnabled;
       audio.volume = 1.0;
       await audio.play();
       sirenPlayingRef.current = true;
@@ -128,14 +119,16 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
         console.warn('[sos admin] SOS siren fallback blocked or unavailable', fallbackErr);
       }
     }
-  }, [soundEnabled, startFallbackSiren]);
+  }, [settings.continuousAlarmEnabled, soundEnabled, startFallbackSiren]);
 
   useEffect(() => {
     setSoundEnabled(localStorage.getItem('sosSoundEnabled') === 'true');
-    const storedSoundUrl = localStorage.getItem('sosSoundUrl');
-    if (storedSoundUrl && SOS_SOUND_OPTIONS.some((option) => option.url === storedSoundUrl)) {
-      setSelectedSoundUrl(storedSoundUrl);
-    }
+    api<{ settings: SosSettings }>('/sos-settings', { suppressErrorLog: true })
+      .then((data) => {
+        setSettings(data.settings);
+        setSelectedSoundUrl(data.settings.sound.url);
+      })
+      .catch((err) => console.warn('[sos admin] Failed to load SOS settings', err));
 
     const storedMuted = localStorage.getItem('mutedSosAlertIds');
     if (storedMuted) {
@@ -153,9 +146,12 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
   useEffect(() => {
     stopSiren();
     const audio = new Audio(selectedSoundUrl);
-    audio.loop = true;
+    audio.loop = settings.continuousAlarmEnabled;
     audio.volume = 1.0;
     audio.preload = 'auto';
+    audio.onended = () => {
+      sirenPlayingRef.current = false;
+    };
     audio.load();
     sirenAudioRef.current = audio;
 
@@ -163,14 +159,7 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
       audio.pause();
       audio.src = '';
     };
-  }, [selectedSoundUrl, stopSiren]);
-
-  const selectSound = (url: string) => {
-    if (!SOS_SOUND_OPTIONS.some((option) => option.url === url)) return;
-    localStorage.setItem('sosSoundUrl', url);
-    setSelectedSoundUrl(url);
-    setSoundBlocked(false);
-  };
+  }, [selectedSoundUrl, settings.continuousAlarmEnabled, stopSiren]);
 
   const pollActiveAlerts = useCallback(async () => {
     console.info('[sos admin] Polling active SOS alerts');
@@ -288,20 +277,12 @@ export function AdminSosNotifier({ onCountChange }: AdminSosNotifierProps) {
   const pendingAlerts = alerts.filter((alert) => !alert.adminAcknowledged && alert.status === 'ACTIVE');
   const audiblePendingAlerts = pendingAlerts.filter((alert) => !mutedAlertIds.has(alert.id));
   const renderSoundPicker = () => (
-    <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold">
-      <span>SOS sound</span>
-      <select
-        value={selectedSoundUrl}
-        onChange={(event) => selectSound(event.target.value)}
-        className="min-h-10 rounded-lg border border-current/30 bg-white px-2 py-1 text-sm font-semibold text-slate-900 shadow-sm"
-      >
-        {SOS_SOUND_OPTIONS.map((option) => (
-          <option key={option.url} value={option.url}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="text-xs font-semibold">
+      <span className="block">SOS sound</span>
+      <Link href="/admin/settings/sos" className="mt-1 inline-flex min-h-10 items-center rounded-lg border border-current/30 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50">
+        {settings.sound.label}
+      </Link>
+    </div>
   );
 
   useEffect(() => {

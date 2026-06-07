@@ -24,9 +24,17 @@ export async function getProfile(req: AuthRequest, res: Response) {
     include: {
       profile: { include: { documents: true } },
       seasonMemberships: { include: { season: true } },
+      residentHouseAssignments: {
+        where: { vacatedAt: null },
+        include: { houseAssignment: true, season: true },
+        orderBy: { assignedAt: 'desc' },
+        take: 1,
+      },
       roomAssignments: {
         where: { vacatedAt: null },
         include: { room: { include: { building: { include: { property: true } } } }, bed: true },
+        orderBy: { assignedAt: 'desc' },
+        take: 1,
       },
     },
   });
@@ -167,6 +175,12 @@ export async function listResidents(req: AuthRequest, res: Response) {
     include: {
       profile: true,
       seasonMemberships: { include: { season: true } },
+      residentHouseAssignments: {
+        where: { vacatedAt: null },
+        include: { houseAssignment: true, season: true },
+        orderBy: { assignedAt: 'desc' },
+        take: 1,
+      },
     },
     orderBy: { profile: { fullName: 'asc' } },
   });

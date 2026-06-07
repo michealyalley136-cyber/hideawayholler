@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { PaymentStatus, MaintenanceStatus, ResidentStatus, SupplyRequestStatus, ReviewStatus, SosAlertStatus } from '@prisma/client';
+import { LeaseWorkflowStatus, PaymentStatus, MaintenanceStatus, ResidentStatus, SupplyRequestStatus, ReviewStatus, SosAlertStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { getJourneySteps } from '../utils/residentJourney';
@@ -17,8 +17,8 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
     totalResidents,
     activeResidents,
     newApplications,
-    beds,
-    occupiedAssignments,
+    houseCapacity,
+    houseOccupancyCount,
     openMaintenance,
     rentDue,
     overduePayments,
@@ -31,8 +31,8 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
     prisma.user.count({ where: { role: { in: ['RESIDENT', 'ALUMNI'] } } }),
     prisma.seasonResident.count({ where: { status: ResidentStatus.ACTIVE_RESIDENT } }),
     prisma.application.count({ where: { status: 'PENDING' } }),
-    prisma.bed.count({ where: { isActive: true, room: { building: { name: { in: ANIMAL_HOUSES } } } } }),
-    prisma.roomAssignment.count({ where: { vacatedAt: null, room: { building: { name: { in: ANIMAL_HOUSES } } } } }),
+    prisma.houseAssignment.aggregate({ where: { status: 'ACTIVE' }, _sum: { capacity: true } }),
+    prisma.residentHouseAssignment.count({ where: { vacatedAt: null, houseAssignment: { status: 'ACTIVE' } } }),
     prisma.maintenanceRequest.count({ where: { status: { in: [MaintenanceStatus.OPEN, MaintenanceStatus.ASSIGNED, MaintenanceStatus.IN_PROGRESS] } } }),
     prisma.payment.count({ where: { status: PaymentStatus.DUE } }),
     prisma.payment.count({ where: { status: PaymentStatus.OVERDUE } }),
@@ -47,8 +47,9 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
     prisma.sosAlert.count({ where: { status: { in: [SosAlertStatus.ACTIVE, SosAlertStatus.ACKNOWLEDGED, SosAlertStatus.NEEDS_HELP] } } }),
   ]);
 
-  const vacantBeds = Math.max(0, beds - occupiedAssignments);
-  const houseOccupancy = `${occupiedAssignments}/${beds}`;
+  const beds = houseCapacity._sum.capacity || 0;
+  const vacantBeds = Math.max(0, beds - houseOccupancyCount);
+  const houseOccupancy = `${houseOccupancyCount}/${beds}`;
   const weatherAlerts = 0;
 
   res.json({
@@ -57,7 +58,7 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
       activeResidents,
       newApplications,
       vacantBeds,
-      occupiedBeds: occupiedAssignments,
+      occupiedBeds: houseOccupancyCount,
       openMaintenance,
       rentDue,
       overduePayments,
@@ -75,7 +76,7 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
 export async function residentDashboard(req: AuthRequest, res: Response) {
   const userId = req.user!.userId;
 
-  const [profile, activeSeason, unreadNotices, payments, maintenance, checkIn] = await Promise.all([
+  const [profile, activeSeason, unreadNotices, payments, maintenance, checkIn, currentHouseAssignment, currentLease] = await Promise.all([
     prisma.residentProfile.findUnique({ where: { userId }, include: { documents: true } }),
     prisma.seasonResident.findFirst({
       where: { userId },
@@ -103,6 +104,15 @@ export async function residentDashboard(req: AuthRequest, res: Response) {
       where: { userId },
       orderBy: { createdAt: 'desc' },
     }),
+    prisma.residentHouseAssignment.findFirst({
+      where: { userId, vacatedAt: null },
+      include: { houseAssignment: true },
+      orderBy: { assignedAt: 'desc' },
+    }),
+    prisma.lease.findFirst({
+      where: { userId, status: { notIn: [LeaseWorkflowStatus.DRAFT, LeaseWorkflowStatus.ARCHIVED] } },
+      orderBy: { createdAt: 'desc' },
+    }),
   ]);
 
   const status = activeSeason?.status || profile?.currentStatus || ResidentStatus.APPLICANT;
@@ -116,5 +126,7 @@ export async function residentDashboard(req: AuthRequest, res: Response) {
     recentPayments: payments,
     recentMaintenance: maintenance,
     checkIn,
+    currentAssignment: currentHouseAssignment?.houseAssignment.houseName,
+    currentLease,
   });
 }

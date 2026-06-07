@@ -12,6 +12,7 @@ enum UserRole {
   RESIDENT
   ALUMNI
   ADMIN
+  SUPER_ADMIN
 }
 
 enum ResidentStatus {
@@ -45,6 +46,40 @@ enum PaymentType {
   RENT
   DEPOSIT
   OTHER
+}
+
+enum BusinessSubscriptionStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  PAUSED
+}
+
+enum BusinessInvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+enum BusinessPaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum BusinessSetupFeeStatus {
+  PENDING
+  PAID
+  WAIVED
+  NOT_REQUIRED
 }
 
 enum NoticeCategory {
@@ -128,6 +163,29 @@ enum SosEventType {
   ADMIN_MARKED_RESOLVED
   SOS_RESOLVED
   SOS_MUTED
+}
+
+enum SosSoundKey {
+  EMERGENCY_SIREN
+  AIR_HORN
+  ALERT_BELL
+  CRITICAL_ALERT
+  WARNING_TONE
+}
+
+enum HouseAssignmentStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum LeaseWorkflowStatus {
+  DRAFT
+  ASSIGNED
+  PENDING_SIGNATURE
+  SIGNED_BY_RESIDENT
+  APPROVED_BY_ADMIN
+  COMPLETED
+  ARCHIVED
 }
 
 enum CommunityPostType {
@@ -271,6 +329,7 @@ model User {
   checkIns            CheckIn[]
   checkOuts           CheckOut[]
   roomAssignments     RoomAssignment[]
+  residentHouseAssignments ResidentHouseAssignment[]
   uploadedDocuments   Document[]
   supplyRequests      SupplyRequest[]
   residentReviews     ResidentReview[]
@@ -283,6 +342,7 @@ model User {
   communityAlbumsCreated CommunityAlbum[]
   communityAlbumUploads CommunityAlbumImage[]
   adminDevices AdminDevice[]
+  auditLogs AuditLog[]
 }
 
 model Season {
@@ -304,6 +364,7 @@ model Season {
   galleryAlbums GalleryAlbum[]
   leases        Lease[]
   payments      Payment[]
+  residentHouseAssignments ResidentHouseAssignment[]
 }
 
 model ResidentProfile {
@@ -451,25 +512,72 @@ model RoomAssignment {
   bed  Bed? @relation(fields: [bedId], references: [id], onDelete: SetNull)
 }
 
+model HouseAssignment {
+  id        String                @id @default(uuid())
+  houseName String               @unique
+  capacity  Int                  @default(0)
+  occupancy Int                  @default(0)
+  status    HouseAssignmentStatus @default(ACTIVE)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  residentAssignments ResidentHouseAssignment[]
+
+  @@index([status, houseName])
+  @@map("house_assignments")
+}
+
+model ResidentHouseAssignment {
+  id                String    @id @default(uuid())
+  userId            String
+  houseAssignmentId String
+  seasonId          String?
+  assignedAt        DateTime  @default(now())
+  vacatedAt         DateTime?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  houseAssignment HouseAssignment @relation(fields: [houseAssignmentId], references: [id], onDelete: Cascade)
+  season          Season?         @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+
+  @@index([userId, vacatedAt])
+  @@index([houseAssignmentId, vacatedAt])
+  @@map("resident_house_assignments")
+}
+
 model Lease {
   id             String    @id @default(uuid())
-  userId         String
-  seasonId       String
+  userId         String?
+  seasonId       String?
   title          String
   filePath       String?
   fileName       String?
+  signedFilePath String?
+  signedFileName String?
+  status         LeaseWorkflowStatus @default(DRAFT)
   sentAt         DateTime?
   signedAt       DateTime?
+  approvedAt     DateTime?
+  approvedBy     String?
+  completedAt    DateTime?
+  archivedAt     DateTime?
   expiresAt      DateTime?
   acknowledged   Boolean   @default(false)
   acknowledgedAt DateTime?
   signatureData  String?
+  signatureIp    String?
+  signatureUserAgent String?
   notes          String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season Season? @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
 }
 
 model Payment {
@@ -494,6 +602,102 @@ model Payment {
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+}
+
+model BusinessAccount {
+  id               String   @id @default(uuid())
+  businessName     String   @default("Hideaway Holler")
+  billingEmail     String?
+  stripeCustomerId String?  @unique
+  setupFeeAmount   Int      @default(0)
+  setupFeeStatus   BusinessSetupFeeStatus @default(PENDING)
+  setupFeePaidAt   DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subscriptions BusinessSubscription[]
+  invoices      BusinessInvoice[]
+  payments      BusinessPayment[]
+
+  @@map("business_accounts")
+}
+
+model BusinessSubscription {
+  id                   String                     @id @default(uuid())
+  businessAccountId    String
+  stripeSubscriptionId String?                    @unique
+  stripeCustomerId     String?
+  stripePriceId        String?
+  planName             String?
+  status               BusinessSubscriptionStatus @default(INCOMPLETE)
+  cancelAtPeriodEnd    Boolean                    @default(false)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  trialEnd             DateTime?
+  canceledAt           DateTime?
+  latestInvoiceId      String?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+
+  businessAccount BusinessAccount  @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
+  invoices        BusinessInvoice[]
+  payments        BusinessPayment[]
+
+  @@index([businessAccountId, status])
+  @@index([stripeCustomerId])
+  @@map("business_subscriptions")
+}
+
+model BusinessInvoice {
+  id                     String                @id @default(uuid())
+  businessAccountId      String
+  businessSubscriptionId String?
+  stripeInvoiceId        String?               @unique
+  invoiceNumber          String?
+  hostedInvoiceUrl       String?
+  invoicePdf             String?
+  amountDue              Int                   @default(0)
+  amountPaid             Int                   @default(0)
+  currency               String                @default("usd")
+  status                 BusinessInvoiceStatus @default(OPEN)
+  dueDate                DateTime?
+  paidAt                 DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  businessAccount      BusinessAccount        @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
+  businessSubscription BusinessSubscription?  @relation(fields: [businessSubscriptionId], references: [id], onDelete: SetNull)
+  payments             BusinessPayment[]
+
+  @@index([businessAccountId, status])
+  @@index([businessSubscriptionId])
+  @@map("business_invoices")
+}
+
+model BusinessPayment {
+  id                     String                @id @default(uuid())
+  businessAccountId      String
+  businessSubscriptionId String?
+  businessInvoiceId      String?
+  stripePaymentIntentId  String?               @unique
+  stripeChargeId         String?
+  amount                 Int                   @default(0)
+  currency               String                @default("usd")
+  status                 BusinessPaymentStatus @default(PENDING)
+  receiptUrl             String?
+  paidAt                 DateTime?
+  failureMessage         String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  businessAccount      BusinessAccount        @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
+  businessSubscription BusinessSubscription?  @relation(fields: [businessSubscriptionId], references: [id], onDelete: SetNull)
+  businessInvoice      BusinessInvoice?       @relation(fields: [businessInvoiceId], references: [id], onDelete: SetNull)
+
+  @@index([businessAccountId, status])
+  @@index([businessSubscriptionId])
+  @@index([businessInvoiceId])
+  @@map("business_payments")
 }
 
 model Notice {
@@ -702,6 +906,33 @@ model EmergencyNotificationLog {
   @@index([emergencyAlertId, createdAt])
   @@index([channel, status, createdAt])
   @@map("emergency_notification_logs")
+}
+
+model AppSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actorRole  UserRole?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
 }
 
 model GalleryAlbum {

@@ -33,7 +33,7 @@ export const transitResources = [
 
 export const wifiInfo = {
   network: 'Hideaway Guest',
-  password: 'Hideaway guest',
+  password: 'See property management for the current Wi-Fi password.',
 };
 
 export const arrivalChecklist = [

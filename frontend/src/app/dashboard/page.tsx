@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, CreditCard, Home, MapPin, PackageOpen, ShieldAlert, Wifi, Wrench } from 'lucide-react';
+import { Bell, CreditCard, FileText, Home, MapPin, PackageOpen, ShieldAlert, Wifi, Wrench } from 'lucide-react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
 import { JourneyTracker } from '@/components/JourneyTracker';
@@ -21,6 +21,15 @@ export default function ResidentDashboard() {
     unreadNotices: number;
     recentPayments: Payment[];
     recentMaintenance: { id: string; description: string; status: string }[];
+    currentAssignment?: string;
+    currentLease?: {
+      id: string;
+      title: string;
+      status: string;
+      sentAt?: string;
+      signedAt?: string;
+      signedFilePath?: string;
+    };
   } | null>(null);
 
   useEffect(() => {
@@ -107,7 +116,18 @@ export default function ResidentDashboard() {
                   <Home className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">House Assignment</p>
-                    <p className="text-xl font-semibold">View profile</p>
+                    <p className="text-xl font-semibold">{data?.currentAssignment || 'Not assigned'}</p>
+                  </div>
+                </CardBody>
+              </Card>
+            </Link>
+            <Link href="/leases" className="block">
+              <Card className="transition-colors hover:border-brand-300">
+                <CardBody className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-brand-600" />
+                  <div>
+                    <p className="text-sm text-slate-500">Lease Status</p>
+                    <p className="text-xl font-semibold">{data?.currentLease?.status ? data.currentLease.status.replace(/_/g, ' ') : 'No lease'}</p>
                   </div>
                 </CardBody>
               </Card>

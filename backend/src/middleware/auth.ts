@@ -33,3 +33,7 @@ export function authorize(...roles: UserRole[]) {
 export function authorizeAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   return authorize(UserRole.ADMIN)(req, res, next);
 }
+
+export function authorizeSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  return authorize(UserRole.SUPER_ADMIN)(req, res, next);
+}

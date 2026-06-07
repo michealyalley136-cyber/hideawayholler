@@ -32,6 +32,11 @@ export function ProtectedRoute({
 
     if (!roles && user.role === 'ADMIN' && !pathname.startsWith('/admin')) {
       router.replace('/admin/dashboard');
+      return;
+    }
+
+    if (!roles && user.role === 'SUPER_ADMIN' && !pathname.startsWith('/super-admin')) {
+      router.replace('/super-admin/dashboard');
     }
   }, [loading, pathname, roles, router, user]);
 
@@ -46,6 +51,7 @@ export function ProtectedRoute({
   if (!user) return null;
   if (roles && !roles.includes(user.role)) return null;
   if (!roles && user.role === 'ADMIN' && !pathname.startsWith('/admin')) return null;
+  if (!roles && user.role === 'SUPER_ADMIN' && !pathname.startsWith('/super-admin')) return null;
 
   return <>{children}</>;
 }

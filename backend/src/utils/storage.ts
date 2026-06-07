@@ -6,8 +6,8 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const PRIVATE_UPLOAD_DIR = process.env.PRIVATE_UPLOAD_DIR || './private_uploads';
 
 export function ensureUploadDirs() {
-  const dirs = ['documents', 'leases', 'receipts', 'maintenance', 'gallery', 'checkin', 'checkout', 'avatars'];
-  const privateDirs = ['community'];
+  const dirs = ['documents', 'receipts', 'maintenance', 'gallery', 'checkin', 'checkout', 'avatars'];
+  const privateDirs = ['community', 'leases', 'signed-leases'];
 
   for (const dir of dirs) {
     const full = path.join(UPLOAD_DIR, dir);

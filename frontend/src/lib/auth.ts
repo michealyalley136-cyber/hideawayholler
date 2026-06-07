@@ -78,8 +78,10 @@ export function clearAuth() {
 
 export function getDashboardPath(role: UserRole | string): string {
   switch (role) {
-    case 'ADMIN':
+    case 'SUPER_ADMIN':
     case 'SUPERADMIN':
+      return '/super-admin/dashboard';
+    case 'ADMIN':
       return '/admin/dashboard';
     case 'ALUMNI':
       return '/dashboard';

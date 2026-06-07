@@ -25,6 +25,7 @@ import {
   Star,
   Wifi,
   ShieldAlert,
+  Settings,
 } from 'lucide-react';
 import { UserRole } from '@/lib/types';
 
@@ -54,12 +55,14 @@ const residentNav = [
 const adminNav = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/sos', label: 'SOS Center', icon: AlertTriangle },
+  { href: '/admin/settings/sos', label: 'SOS Settings', icon: Settings },
   { href: '/admin/residents', label: 'Residents', icon: Users },
   { href: '/admin/seasons', label: 'Seasons', icon: Calendar },
   { href: '/admin/housing', label: 'Housing', icon: Building2 },
   { href: '/admin/applications', label: 'Applications', icon: ClipboardList },
   { href: '/admin/leases', label: 'Leases', icon: FileText },
   { href: '/admin/payments', label: 'Payments', icon: CreditCard },
+  { href: '/admin/billing/subscription', label: 'Billing', icon: CreditCard },
   { href: '/admin/notices', label: 'Notices', icon: Bell },
   { href: '/admin/supply-requests', label: 'Supply Requests', icon: PackageOpen },
   { href: '/admin/reviews', label: 'Reviews', icon: Star },
@@ -67,6 +70,10 @@ const adminNav = [
   { href: '/admin/gallery', label: 'Gallery', icon: Image },
   { href: '/admin/local-guide', label: 'Local Guide', icon: MapPin },
   { href: '/admin/check-ins', label: 'Check-Ins', icon: LogIn },
+];
+
+const superAdminNav = [
+  { href: '/super-admin/clients/hideaway-holler', label: 'Hideaway Holler', icon: Building2, exact: true },
 ];
 
 const alumniNav = [
@@ -78,8 +85,8 @@ const alumniNav = [
 
 export function Sidebar({ role, onNavigate, activeSosCount = 0 }: { role: UserRole; onNavigate?: () => void; activeSosCount?: number }) {
   const pathname = usePathname();
-  const nav = role === 'ADMIN' ? adminNav : role === 'ALUMNI' ? alumniNav : residentNav;
-  const homeHref = role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
+  const nav = role === 'SUPER_ADMIN' ? superAdminNav : role === 'ADMIN' ? adminNav : role === 'ALUMNI' ? alumniNav : residentNav;
+  const homeHref = role === 'SUPER_ADMIN' ? '/super-admin/dashboard' : role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
 
   return (
     <>
@@ -87,8 +94,8 @@ export function Sidebar({ role, onNavigate, activeSosCount = 0 }: { role: UserRo
         <Link href={homeHref} className="flex items-center gap-2 px-3 py-3" onClick={onNavigate}>
           <img src="/hideaway-logo.png" alt="Hideaway Holler" className="h-10 w-10 shrink-0 rounded-full object-cover" />
           <div>
-            <p className="font-semibold text-slate-900 text-sm">HollerHub</p>
-            <p className="text-xs text-slate-500">Hideaway Holler</p>
+            <p className="font-semibold text-slate-900 text-sm">{role === 'SUPER_ADMIN' ? 'AppCreatives' : 'HollerHub'}</p>
+            <p className="text-xs text-slate-500">{role === 'SUPER_ADMIN' ? 'Office Dashboard' : 'Hideaway Holler'}</p>
           </div>
         </Link>
       </div>

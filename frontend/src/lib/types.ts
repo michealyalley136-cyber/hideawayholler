@@ -1,4 +1,4 @@
-export type UserRole = 'APPLICANT' | 'RESIDENT' | 'ALUMNI' | 'ADMIN';
+export type UserRole = 'APPLICANT' | 'RESIDENT' | 'ALUMNI' | 'ADMIN' | 'SUPER_ADMIN';
 
 export type ResidentStatus =
   | 'APPLICANT'

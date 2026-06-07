@@ -209,7 +209,7 @@ export default function HideawayHollerClientPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await api<ClientDashboard>('/business-billing/super-admin/clients/hideaway-holler');
+      const response = await api<ClientDashboard>('/business-billing/super-admin-client-dashboard');
       setData(response);
       setBusinessName(response.client.name || 'Hideaway Holler');
       setBillingEmail(response.client.billingEmail || '');
@@ -232,7 +232,7 @@ export default function HideawayHollerClientPage() {
     setError('');
     setMessage('');
     try {
-      await api('/business-billing/super-admin/account', {
+      await api('/business-billing/super-admin-account', {
         method: 'PATCH',
         body: { businessName, billingEmail, setupFeeAmount, setupFeeStatus },
       });
@@ -250,7 +250,7 @@ export default function HideawayHollerClientPage() {
     setError('');
     setMessage('');
     try {
-      await api('/business-billing/super-admin/sync-stripe', { method: 'POST' });
+      await api('/business-billing/super-admin-sync-stripe', { method: 'POST' });
       setMessage('Stripe records synced.');
       await loadDashboard();
     } catch (err) {

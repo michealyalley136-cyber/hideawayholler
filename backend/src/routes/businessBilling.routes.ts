@@ -23,5 +23,8 @@ router.get('/super-admin', authenticate, authorizeSuperAdmin, getSuperAdminBilli
 router.get('/super-admin/clients/hideaway-holler', authenticate, authorizeSuperAdmin, getSuperAdminClientDashboard);
 router.patch('/super-admin/account', authenticate, authorizeSuperAdmin, updateSuperAdminBusinessAccount);
 router.post('/super-admin/sync-stripe', authenticate, authorizeSuperAdmin, syncBusinessBillingFromStripe);
+router.get('/super-admin-client-dashboard', authenticate, authorizeSuperAdmin, getSuperAdminClientDashboard);
+router.patch('/super-admin-account', authenticate, authorizeSuperAdmin, updateSuperAdminBusinessAccount);
+router.post('/super-admin-sync-stripe', authenticate, authorizeSuperAdmin, syncBusinessBillingFromStripe);
 
 export default router;

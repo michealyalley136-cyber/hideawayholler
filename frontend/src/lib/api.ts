@@ -4,6 +4,7 @@ const rawApiUrl = configuredApiUrl || (process.env.NODE_ENV !== 'production' ? l
 
 export const apiOrigin = rawApiUrl ? rawApiUrl.replace(/\/+$/, '').replace(/\/api$/, '') : '';
 export const apiUrl = apiOrigin ? `${apiOrigin}/api` : '';
+const useBrowserProxy = typeof window !== 'undefined' && process.env.NODE_ENV === 'production';
 
 if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
   console.info('[api] Runtime API configuration', {
@@ -27,12 +28,17 @@ function getToken(): string | null {
   return getStoredToken();
 }
 
+function cleanApiPath(path: string) {
+  return path.startsWith('/') ? path : `/${path}`;
+}
+
 function apiPath(path: string) {
   if (/^https?:\/\//.test(path)) return path;
   if (!apiUrl) {
     throw new ApiError(0, 'HollerHub API is not configured. Set NEXT_PUBLIC_API_URL to the deployed backend URL.');
   }
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const cleanPath = cleanApiPath(path);
+  if (useBrowserProxy) return `/api/backend${cleanPath}`;
   return `${apiUrl}${cleanPath}`;
 }
 
@@ -51,7 +57,7 @@ function errorMessageForNetworkFailure() {
 export async function apiHealth() {
   // Explicitly check the configured API health endpoint so the error message
   // can show the exact route we attempted.
-  const healthUrl = apiUrl ? `${apiUrl}/health` : '';
+  const healthUrl = apiUrl ? (useBrowserProxy ? '/api/backend/health' : `${apiUrl}/health`) : '';
   if (!healthUrl) {
     throw new ApiError(0, 'HollerHub API is not configured. Set NEXT_PUBLIC_API_URL to the backend base URL (e.g. https://hollerhub-api.vercel.app)');
   }

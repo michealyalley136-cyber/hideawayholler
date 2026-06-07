@@ -45,7 +45,7 @@ export async function saveClientBillingSettings(
     businessName?: string;
     billingEmail?: string | null;
     setupFeeAmount: number;
-    setupFeeStatus: BusinessSetupFeeStatus;
+    setupFeeStatus?: BusinessSetupFeeStatus;
     monthlySubscriptionAmount: number;
     billingFrequency: BillingFrequency;
     billingStartDate?: string | null;
@@ -65,6 +65,7 @@ export async function saveClientBillingSettings(
   if (!nextBillingDate && billingStartDate) {
     nextBillingDate = addBillingInterval(billingStartDate, input.billingFrequency);
   }
+  const setupFeeStatus = input.setupFeeStatus || settings.setupFeeStatus || account.setupFeeStatus;
 
   const [updatedAccount, updatedSettings] = await prisma.$transaction([
     prisma.businessAccount.update({
@@ -73,7 +74,7 @@ export async function saveClientBillingSettings(
         ...(input.businessName ? { businessName: input.businessName } : {}),
         billingEmail: input.billingEmail ?? account.billingEmail,
         setupFeeAmount: input.setupFeeAmount,
-        setupFeeStatus: input.setupFeeStatus,
+        setupFeeStatus,
         stripeCustomerId: input.stripeCustomerId ?? account.stripeCustomerId,
       },
     }),
@@ -81,7 +82,7 @@ export async function saveClientBillingSettings(
       where: { id: settings.id },
       data: {
         setupFeeAmount: input.setupFeeAmount,
-        setupFeeStatus: input.setupFeeStatus,
+        setupFeeStatus,
         monthlySubscriptionAmount: input.monthlySubscriptionAmount,
         billingFrequency: input.billingFrequency,
         billingStartDate,

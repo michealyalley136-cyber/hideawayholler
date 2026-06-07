@@ -387,11 +387,11 @@ export async function saveSuperAdminBillingSettings(req: AuthRequest, res: Respo
     return res.status(400).json({ error: 'Monthly subscription amount must be a valid non-negative number' });
   }
 
-  const setupFeeStatus = body.setupFeeStatus as BusinessSetupFeeStatus;
+  const setupFeeStatus = typeof body.setupFeeStatus === 'string' ? (body.setupFeeStatus as BusinessSetupFeeStatus) : undefined;
   const billingFrequency = body.billingFrequency as BillingFrequency;
   const subscriptionStatus = body.subscriptionStatus as ClientSubscriptionStatus;
 
-  if (!Object.values(BusinessSetupFeeStatus).includes(setupFeeStatus)) return res.status(400).json({ error: 'Invalid setup fee status' });
+  if (setupFeeStatus && !Object.values(BusinessSetupFeeStatus).includes(setupFeeStatus)) return res.status(400).json({ error: 'Invalid setup fee status' });
   if (!Object.values(BillingFrequency).includes(billingFrequency)) return res.status(400).json({ error: 'Invalid billing frequency' });
   if (!Object.values(ClientSubscriptionStatus).includes(subscriptionStatus)) return res.status(400).json({ error: 'Invalid subscription status' });
 

@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import {
   Activity,
   AlertTriangle,
-  CheckCircle2,
   CreditCard,
   FileText,
   HeartPulse,
@@ -26,7 +25,6 @@ type HealthStatus = 'Good' | 'Needs Attention' | 'Past Due' | 'Critical';
 
 interface BillingSettings {
   setupFeeAmount: number;
-  setupFeeStatus: string;
   monthlySubscriptionAmount: number;
   billingFrequency: string;
   billingStartDate?: string | null;
@@ -236,7 +234,6 @@ const defaultBillingForm = {
   businessName: 'Hideaway Holler',
   billingEmail: '',
   setupFeeAmount: 0,
-  setupFeeStatus: 'NOT_SENT',
   monthlySubscriptionAmount: 0,
   billingFrequency: 'MONTHLY',
   billingStartDate: '',
@@ -270,7 +267,6 @@ export default function HideawayHollerClientPage() {
       businessName: response.client.name || 'Hideaway Holler',
       billingEmail: response.client.billingEmail || '',
       setupFeeAmount: settings?.setupFeeAmountDollars ?? centsToDollars(response.dashboardCards.setupFeeAmount),
-      setupFeeStatus: settings?.setupFeeStatus || response.dashboardCards.setupFeePaymentStatus || 'NOT_SENT',
       monthlySubscriptionAmount: settings?.monthlySubscriptionAmountDollars ?? centsToDollars(settings?.monthlySubscriptionAmount),
       billingFrequency: settings?.billingFrequency || 'MONTHLY',
       billingStartDate: toDateInput(settings?.billingStartDate),
@@ -423,7 +419,6 @@ export default function HideawayHollerClientPage() {
           <StatCard title="Outstanding balance" value={formatMoney(cards?.outstandingBalance)} icon={AlertTriangle} accent="text-amber-700 bg-amber-50" />
           <StatCard title="Monthly recurring revenue" value={billingConfigured ? formatMoney(cards?.monthlyRecurringRevenue) : '$0.00'} icon={Activity} />
           <StatCard title="Subscription status" value={readable(cards?.subscriptionStatus)} icon={ShieldCheck} />
-          <StatCard title="Setup fee status" value={readable(cards?.setupFeePaymentStatus)} icon={CheckCircle2} />
           <StatCard title="Next billing date" value={formatDate(cards?.nextBillingDate)} icon={CreditCard} />
           <StatCard title="Total payments received" value={hasPayments ? formatMoney(cards?.totalPaymentsReceived) : '$0.00'} icon={CreditCard} />
           <Card>
@@ -452,15 +447,6 @@ export default function HideawayHollerClientPage() {
                   </Field>
                   <Field label="Setup Fee Amount ($)">
                     <input type="number" min={0} step={0.01} value={billingForm.setupFeeAmount} onChange={(e) => setBillingForm({ ...billingForm, setupFeeAmount: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                  </Field>
-                  <Field label="Setup Fee Status">
-                    <select value={billingForm.setupFeeStatus} onChange={(e) => setBillingForm({ ...billingForm, setupFeeStatus: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                      <option value="NOT_SENT">Not Sent</option>
-                      <option value="PENDING">Pending</option>
-                      <option value="PAID">Paid</option>
-                      <option value="WAIVED">Waived</option>
-                      <option value="FAILED">Failed</option>
-                    </select>
                   </Field>
                   <Field label="Monthly Subscription Amount ($)">
                     <input type="number" min={0} step={0.01} value={billingForm.monthlySubscriptionAmount} onChange={(e) => setBillingForm({ ...billingForm, monthlySubscriptionAmount: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />

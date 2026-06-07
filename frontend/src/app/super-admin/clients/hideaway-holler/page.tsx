@@ -388,7 +388,7 @@ export default function HideawayHollerClientPage() {
 
         {!billingConfigured && !loading && (
           <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            No subscription has been configured yet. Use Client Billing Setup below to set amounts, frequency, and billing dates.
+            No service subscription has been configured yet. Use Client Billing & Subscription below to set the tax rate or start the subscription.
           </div>
         )}
 

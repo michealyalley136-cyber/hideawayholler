@@ -61,10 +61,43 @@ enum BusinessSubscriptionStatus {
 
 enum BusinessInvoiceStatus {
   DRAFT
+  PENDING
   OPEN
   PAID
+  FAILED
+  OVERDUE
+  WAIVED
   VOID
   UNCOLLECTIBLE
+}
+
+enum BusinessInvoiceType {
+  SETUP_FEE
+  MONTHLY_SUBSCRIPTION
+  CUSTOM_CHARGE
+}
+
+enum BillingFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum ClientSubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+  INCOMPLETE
+}
+
+enum BusinessPaymentMethod {
+  STRIPE
+  MANUAL
+  CHECK
+  WIRE
+  OTHER
 }
 
 enum BusinessPaymentStatus {
@@ -76,9 +109,11 @@ enum BusinessPaymentStatus {
 }
 
 enum BusinessSetupFeeStatus {
+  NOT_SENT
   PENDING
   PAID
   WAIVED
+  FAILED
   NOT_REQUIRED
 }
 
@@ -606,20 +641,76 @@ model Payment {
 
 model BusinessAccount {
   id               String   @id @default(uuid())
+  slug             String   @unique @default("hideaway-holler")
   businessName     String   @default("Hideaway Holler")
   billingEmail     String?
   stripeCustomerId String?  @unique
   setupFeeAmount   Int      @default(0)
-  setupFeeStatus   BusinessSetupFeeStatus @default(PENDING)
+  setupFeeStatus   BusinessSetupFeeStatus @default(NOT_SENT)
   setupFeePaidAt   DateTime?
+  isSuspended      Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  subscriptions BusinessSubscription[]
-  invoices      BusinessInvoice[]
-  payments      BusinessPayment[]
+  subscriptions   BusinessSubscription[]
+  invoices        BusinessInvoice[]
+  payments        BusinessPayment[]
+  billingSettings ClientBillingSettings?
+  businessPlan    BusinessPlan?
+  healthLogs      ClientAccountHealthLog[]
 
   @@map("business_accounts")
+}
+
+model ClientBillingSettings {
+  id                        String                   @id @default(uuid())
+  clientId                  String                   @unique
+  setupFeeAmount            Int                      @default(0)
+  setupFeeStatus            BusinessSetupFeeStatus   @default(NOT_SENT)
+  monthlySubscriptionAmount Int                      @default(0)
+  billingFrequency          BillingFrequency         @default(MONTHLY)
+  billingStartDate          DateTime?
+  nextBillingDate           DateTime?
+  paymentDueDay             Int                      @default(1)
+  gracePeriodDays           Int                      @default(7)
+  subscriptionStatus        ClientSubscriptionStatus @default(INCOMPLETE)
+  stripeCustomerId          String?
+  stripeSubscriptionId      String?
+  notes                     String?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  client BusinessAccount @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_billing_settings")
+}
+
+model BusinessPlan {
+  id                        String           @id @default(uuid())
+  clientId                  String           @unique
+  planName                  String           @default("HollerHub Standard")
+  monthlySubscriptionAmount Int              @default(0)
+  setupFeeAmount            Int              @default(0)
+  billingFrequency          BillingFrequency @default(MONTHLY)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+
+  client BusinessAccount @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("business_plans")
+}
+
+model ClientAccountHealthLog {
+  id        String   @id @default(uuid())
+  clientId  String
+  status    String
+  reasons   String[]
+  createdAt DateTime @default(now())
+
+  client BusinessAccount @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@map("client_account_health_logs")
 }
 
 model BusinessSubscription {
@@ -654,12 +745,15 @@ model BusinessInvoice {
   businessSubscriptionId String?
   stripeInvoiceId        String?               @unique
   invoiceNumber          String?
+  invoiceType            BusinessInvoiceType   @default(CUSTOM_CHARGE)
+  description            String?
   hostedInvoiceUrl       String?
   invoicePdf             String?
+  stripeCheckoutUrl      String?
   amountDue              Int                   @default(0)
   amountPaid             Int                   @default(0)
   currency               String                @default("usd")
-  status                 BusinessInvoiceStatus @default(OPEN)
+  status                 BusinessInvoiceStatus @default(PENDING)
   dueDate                DateTime?
   paidAt                 DateTime?
   createdAt              DateTime              @default(now())
@@ -683,6 +777,7 @@ model BusinessPayment {
   stripeChargeId         String?
   amount                 Int                   @default(0)
   currency               String                @default("usd")
+  paymentMethod          BusinessPaymentMethod @default(STRIPE)
   status                 BusinessPaymentStatus @default(PENDING)
   receiptUrl             String?
   paidAt                 DateTime?

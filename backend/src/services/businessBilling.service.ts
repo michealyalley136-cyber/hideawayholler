@@ -62,8 +62,10 @@ export function mapInvoiceStatus(status?: string | null): BusinessInvoiceStatus 
       return BusinessInvoiceStatus.VOID;
     case 'uncollectible':
       return BusinessInvoiceStatus.UNCOLLECTIBLE;
-    default:
+    case 'open':
       return BusinessInvoiceStatus.OPEN;
+    default:
+      return BusinessInvoiceStatus.PENDING;
   }
 }
 

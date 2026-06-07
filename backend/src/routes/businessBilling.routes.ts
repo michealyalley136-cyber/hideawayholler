@@ -11,17 +11,21 @@ import {
 import {
   createSuperAdminInvoice,
   deleteSuperAdminInvoice,
+  generateSuperAdminCurrentServiceInvoice,
   generateSuperAdminSetupFeeInvoice,
   getSuperAdminClientDashboard,
   getSuperAdminInvoice,
   markSuperAdminInvoicePaid,
   markSuperAdminInvoiceWaived,
   reactivateSuperAdminAccount,
+  recordSuperAdminManualServicePayment,
   saveSuperAdminBillingSettings,
   sendInvoicePaymentLink,
+  startSuperAdminServiceSubscription,
   suspendSuperAdminAccount,
   syncBusinessBillingFromStripe,
   updateSuperAdminBusinessAccount,
+  updateSuperAdminServiceSubscriptionSettings,
   waiveSuperAdminSetupFee,
 } from '../controllers/superAdminBilling.controller';
 
@@ -36,6 +40,10 @@ router.get('/super-admin', authenticate, authorizeSuperAdmin, getSuperAdminBilli
 router.get('/super-admin/clients/hideaway-holler', authenticate, authorizeSuperAdmin, getSuperAdminClientDashboard);
 router.get('/super-admin-client-dashboard', authenticate, authorizeSuperAdmin, getSuperAdminClientDashboard);
 router.patch('/super-admin/billing-settings', authenticate, authorizeSuperAdmin, saveSuperAdminBillingSettings);
+router.patch('/super-admin/service-subscription', authenticate, authorizeSuperAdmin, updateSuperAdminServiceSubscriptionSettings);
+router.post('/super-admin/service-subscription/start', authenticate, authorizeSuperAdmin, startSuperAdminServiceSubscription);
+router.post('/super-admin/service-subscription/generate-current-invoice', authenticate, authorizeSuperAdmin, generateSuperAdminCurrentServiceInvoice);
+router.post('/super-admin/service-subscription/manual-payment', authenticate, authorizeSuperAdmin, recordSuperAdminManualServicePayment);
 router.patch('/super-admin/account', authenticate, authorizeSuperAdmin, updateSuperAdminBusinessAccount);
 router.patch('/super-admin-account', authenticate, authorizeSuperAdmin, updateSuperAdminBusinessAccount);
 router.post('/super-admin/invoices', authenticate, authorizeSuperAdmin, createSuperAdminInvoice);

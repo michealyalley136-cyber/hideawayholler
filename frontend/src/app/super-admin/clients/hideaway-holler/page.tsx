@@ -6,13 +6,9 @@ import {
   Activity,
   AlertTriangle,
   CreditCard,
-  FileText,
   HeartPulse,
-  Plus,
   RefreshCw,
   ShieldCheck,
-  Users,
-  Wrench,
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
@@ -76,8 +72,9 @@ interface ClientDashboard {
     reasons: string[];
     factors: Record<string, any>;
   };
-  invoices: InvoiceRow[];
-  payments: PaymentRow[];
+  invoices: unknown[];
+  payments: unknown[];
+  serviceBilling?: ServiceBilling | null;
   maintenanceActivity: MaintenanceRow[];
   auditLogs: AuditLogRow[];
   stripe: {
@@ -88,41 +85,68 @@ interface ClientDashboard {
   };
 }
 
+interface ServiceBilling {
+  subscription: {
+    id: string;
+    serviceSubscriptionStatus: string;
+    subscriptionStartDate?: string | null;
+    firstPaymentDate?: string | null;
+    billingDay: number;
+    introMonthlyFee: string | number;
+    introDurationMonths: number;
+    standardMonthlyFee: string | number;
+    taxRate: string | number;
+    nextPaymentDate?: string | null;
+    lastPaymentDate?: string | null;
+  };
+  currentPlan: string;
+  currentMonthlyFee: number;
+  currentAmountDue: number;
+  currentTaxAmount: number;
+  outstandingBalance: number;
+  totalPaymentsReceived: number;
+  totalInvoicesGenerated: number;
+  paidInvoices: number;
+  unpaidInvoices: number;
+  pastDueInvoices: number;
+  invoices: ServiceInvoiceRow[];
+  payments: ServicePaymentRow[];
+}
+
+interface ServiceInvoiceRow {
+  id: string;
+  invoiceNumber: string;
+  monthNumber: number;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  dueDate: string;
+  subtotal: string | number;
+  taxRate: string | number;
+  taxAmount: string | number;
+  totalDue: string | number;
+  amountPaid: string | number;
+  balanceDue: string | number;
+  status: string;
+  squareCheckoutUrl?: string | null;
+}
+
+interface ServicePaymentRow {
+  id: string;
+  invoiceId?: string | null;
+  amount: string | number;
+  paymentDate: string;
+  paymentMethod: string;
+  paymentProvider?: string | null;
+  providerPaymentId?: string | null;
+  notes?: string | null;
+}
+
 interface UserRow {
   id: string;
   email: string;
   role: string;
   createdAt: string;
   profile?: { fullName?: string | null; currentStatus?: string | null } | null;
-}
-
-interface InvoiceRow {
-  id: string;
-  invoiceNumber?: string | null;
-  invoiceType?: string;
-  description?: string | null;
-  hostedInvoiceUrl?: string | null;
-  invoicePdf?: string | null;
-  stripeCheckoutUrl?: string | null;
-  amountDue: number;
-  amountPaid: number;
-  currency: string;
-  status: string;
-  dueDate?: string | null;
-  createdAt: string;
-}
-
-interface PaymentRow {
-  id: string;
-  amount: number;
-  currency: string;
-  status: string;
-  paymentMethod?: string;
-  stripePaymentIntentId?: string | null;
-  stripeChargeId?: string | null;
-  receiptUrl?: string | null;
-  paidAt?: string | null;
-  createdAt: string;
 }
 
 interface SosRow {
@@ -178,8 +202,6 @@ const statusStyles: Record<string, string> = {
   WAIVED: 'bg-slate-200 text-slate-700',
 };
 
-const UNPAID_STATUSES = ['PENDING', 'FAILED', 'OVERDUE', 'OPEN', 'DRAFT'];
-
 function readable(value?: string | null) {
   return (value || 'Not set').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 }
@@ -192,8 +214,9 @@ function formatDateTime(value?: string | null) {
   return value ? new Date(value).toLocaleString() : 'Not set';
 }
 
-function formatMoney(cents?: number | null, currency = 'usd') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format((cents || 0) / 100);
+function formatDollars(amount?: string | number | null) {
+  const value = Number(amount || 0);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
 function formatDuration(seconds?: number | null) {
@@ -202,23 +225,9 @@ function formatDuration(seconds?: number | null) {
   return `${Math.round(seconds / 60)}m`;
 }
 
-function centsToDollars(cents?: number | null) {
-  return (cents || 0) / 100;
-}
-
 function toDateInput(value?: string | null) {
   if (!value) return '';
   return new Date(value).toISOString().slice(0, 10);
-}
-
-function addBillingInterval(dateValue: string, frequency: string) {
-  if (!dateValue) return '';
-  const date = new Date(`${dateValue}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return '';
-  if (frequency === 'QUARTERLY') date.setMonth(date.getMonth() + 3);
-  else if (frequency === 'YEARLY') date.setFullYear(date.getFullYear() + 1);
-  else date.setMonth(date.getMonth() + 1);
-  return date.toISOString().slice(0, 10);
 }
 
 function StatCard({ title, value, icon: Icon, accent = 'text-brand-700 bg-brand-50' }: { title: string; value: string | number; icon: any; accent?: string }) {
@@ -239,30 +248,19 @@ function StatCard({ title, value, icon: Icon, accent = 'text-brand-700 bg-brand-
   );
 }
 
-const defaultBillingForm = {
-  businessName: 'Hideaway Holler',
-  billingEmail: '',
-  setupFeeAmount: '',
-  monthlySubscriptionAmount: '',
-  billingFrequency: 'MONTHLY',
-  billingStartDate: '',
-  nextBillingDate: '',
-  paymentDueDay: 1,
-  gracePeriodDays: 7,
-  stripeCustomerId: '',
-  stripeSubscriptionId: '',
-  notes: '',
-};
-
 export default function HideawayHollerClientPage() {
   const [data, setData] = useState<ClientDashboard | null>(null);
-  const [billingForm, setBillingForm] = useState(defaultBillingForm);
-  const [invoiceForm, setInvoiceForm] = useState({
-    invoiceType: 'MONTHLY_SUBSCRIPTION',
+  const [serviceForm, setServiceForm] = useState({
+    taxRate: '',
+    subscriptionStartDate: '',
+    billingDay: 1,
+    serviceSubscriptionStatus: 'not_started',
+  });
+  const [manualPaymentForm, setManualPaymentForm] = useState({
+    invoiceId: '',
     amount: '',
-    dueDate: '',
-    description: '',
-    sendToClient: false,
+    paymentMethod: 'manual',
+    notes: '',
   });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -270,21 +268,15 @@ export default function HideawayHollerClientPage() {
   const [error, setError] = useState('');
 
   const populateBillingForm = useCallback((response: ClientDashboard) => {
-    const settings = response.billingSettings;
-    setBillingForm({
-      businessName: response.client.name || 'Hideaway Holler',
-      billingEmail: response.client.billingEmail || '',
-      setupFeeAmount: String((settings?.setupFeeAmountDollars ?? centsToDollars(response.dashboardCards.setupFeeAmount)) || ''),
-      monthlySubscriptionAmount: String((settings?.monthlySubscriptionAmountDollars ?? centsToDollars(settings?.monthlySubscriptionAmount)) || ''),
-      billingFrequency: settings?.billingFrequency || 'MONTHLY',
-      billingStartDate: toDateInput(settings?.billingStartDate),
-      nextBillingDate: toDateInput(settings?.nextBillingDate || response.dashboardCards.nextBillingDate),
-      paymentDueDay: settings?.paymentDueDay || 1,
-      gracePeriodDays: settings?.gracePeriodDays ?? 7,
-      stripeCustomerId: settings?.stripeCustomerId || response.client.stripeCustomerId || '',
-      stripeSubscriptionId: settings?.stripeSubscriptionId || '',
-      notes: settings?.notes || '',
-    });
+    const serviceSubscription = response.serviceBilling?.subscription;
+    if (serviceSubscription) {
+      setServiceForm({
+        taxRate: String(serviceSubscription.taxRate ?? ''),
+        subscriptionStartDate: toDateInput(serviceSubscription.subscriptionStartDate),
+        billingDay: serviceSubscription.billingDay || 1,
+        serviceSubscriptionStatus: serviceSubscription.serviceSubscriptionStatus || 'not_started',
+      });
+    }
   }, []);
 
   const loadDashboard = useCallback(async () => {
@@ -320,81 +312,55 @@ export default function HideawayHollerClientPage() {
     }
   };
 
-  const saveBillingSettings = async (event: FormEvent) => {
+  const saveServiceSettings = async (event: FormEvent) => {
     event.preventDefault();
-    await runAction('save-billing', async () => {
-      await api('/business-billing/super-admin/billing-settings', {
+    await runAction('save-service-settings', async () => {
+      await api('/business-billing/super-admin/service-subscription', {
         method: 'PATCH',
         body: {
-          ...billingForm,
-          setupFeeAmount: Number(billingForm.setupFeeAmount || 0),
-          monthlySubscriptionAmount: Number(billingForm.monthlySubscriptionAmount || 0),
+          taxRate: Number(serviceForm.taxRate || 0),
+          subscriptionStartDate: serviceForm.subscriptionStartDate || null,
+          billingDay: serviceForm.billingDay,
+          serviceSubscriptionStatus: serviceForm.serviceSubscriptionStatus,
         },
       });
-    }, 'Billing settings saved.');
+    }, 'Service subscription settings saved.');
   };
 
-  const syncStripe = async () => {
-    await runAction('sync', async () => {
-      await api('/business-billing/super-admin-sync-stripe', { method: 'POST' });
-    }, 'Stripe records synced.');
+  const startService = async () => {
+    await runAction('start-service-subscription', async () => {
+      await api('/business-billing/super-admin/service-subscription/start', { method: 'POST' });
+    }, 'Service subscription started and first invoice generated.');
   };
 
-  const createInvoice = async (event: FormEvent) => {
+  const generateCurrentServiceInvoice = async () => {
+    await runAction('generate-service-invoice', async () => {
+      await api('/business-billing/super-admin/service-subscription/generate-current-invoice', { method: 'POST' });
+    }, 'Current service invoices generated.');
+  };
+
+  const recordManualServicePayment = async (event: FormEvent) => {
     event.preventDefault();
-    await runAction('create-invoice', async () => {
-      await api('/business-billing/super-admin/invoices', {
+    await runAction('manual-service-payment', async () => {
+      await api('/business-billing/super-admin/service-subscription/manual-payment', {
         method: 'POST',
-        body: { ...invoiceForm, amount: Number(invoiceForm.amount || 0) },
+        body: {
+          invoiceId: manualPaymentForm.invoiceId || null,
+          amount: Number(manualPaymentForm.amount || 0),
+          paymentMethod: manualPaymentForm.paymentMethod,
+          notes: manualPaymentForm.notes,
+        },
       });
-      setInvoiceForm({ invoiceType: 'MONTHLY_SUBSCRIPTION', amount: '', dueDate: '', description: '', sendToClient: false });
-    }, 'Invoice created.');
-  };
-
-  const invoiceAction = async (invoiceId: string, action: string, key: string) => {
-    await runAction(key, async () => {
-      if (action === 'send-link') {
-        const result = await api<{ checkoutUrl?: string }>(`/business-billing/super-admin/invoices/${invoiceId}/send-payment-link`, { method: 'POST' });
-        if (result.checkoutUrl) window.open(result.checkoutUrl, '_blank');
-      } else if (action === 'mark-paid') {
-        await api(`/business-billing/super-admin/invoices/${invoiceId}/mark-paid`, { method: 'POST' });
-      } else if (action === 'mark-waived') {
-        await api(`/business-billing/super-admin/invoices/${invoiceId}/mark-waived`, { method: 'POST' });
-      } else if (action === 'delete') {
-        await api(`/business-billing/super-admin/invoices/${invoiceId}`, { method: 'DELETE' });
-      }
-    }, 'Invoice updated.');
-  };
-
-  const generateSetupFeeInvoice = async () => {
-    await runAction('setup-fee-invoice', async () => {
-      await api('/business-billing/super-admin/setup-fee/generate-invoice', { method: 'POST' });
-    }, 'Setup fee invoice generated.');
-  };
-
-  const waiveSetupFee = async () => {
-    await runAction('waive-setup-fee', async () => {
-      await api('/business-billing/super-admin/setup-fee/waive', { method: 'POST' });
-    }, 'Setup fee waived.');
-  };
-
-  const suspendAccount = async () => {
-    await runAction('suspend', async () => {
-      await api('/business-billing/super-admin/account/suspend', { method: 'POST' });
-    }, 'Account suspended.');
-  };
-
-  const reactivateAccount = async () => {
-    await runAction('reactivate', async () => {
-      await api('/business-billing/super-admin/account/reactivate', { method: 'POST' });
-    }, 'Account reactivated.');
+      setManualPaymentForm({ invoiceId: '', amount: '', paymentMethod: 'manual', notes: '' });
+    }, 'Manual service payment recorded.');
   };
 
   const cards = data?.dashboardCards;
   const healthKey = data?.accountHealth.status?.toUpperCase();
-  const billingConfigured = data?.billingConfigured;
-  const hasInvoices = (data?.invoices || []).length > 0;
-  const hasPayments = (data?.payments || []).length > 0;
+  const serviceBilling = data?.serviceBilling;
+  const billingConfigured = Boolean(serviceBilling && serviceBilling.subscription.serviceSubscriptionStatus !== 'not_started');
+  const hasInvoices = (serviceBilling?.invoices || []).length > 0;
+  const hasPayments = (serviceBilling?.payments || []).length > 0;
 
   return (
     <ProtectedRoute roles={['SUPER_ADMIN']}>
@@ -427,11 +393,11 @@ export default function HideawayHollerClientPage() {
         )}
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard title="Outstanding balance" value={formatMoney(cards?.outstandingBalance)} icon={AlertTriangle} accent="text-amber-700 bg-amber-50" />
-          <StatCard title="Monthly recurring revenue" value={billingConfigured ? formatMoney(cards?.monthlyRecurringRevenue) : '$0.00'} icon={Activity} />
-          <StatCard title="Subscription status" value={readable(cards?.subscriptionStatus)} icon={ShieldCheck} />
-          <StatCard title="Next billing date" value={formatDate(cards?.nextBillingDate)} icon={CreditCard} />
-          <StatCard title="Total payments received" value={hasPayments ? formatMoney(cards?.totalPaymentsReceived) : '$0.00'} icon={CreditCard} />
+          <StatCard title="Outstanding balance" value={formatDollars(serviceBilling?.outstandingBalance)} icon={AlertTriangle} accent="text-amber-700 bg-amber-50" />
+          <StatCard title="Current amount due" value={formatDollars(serviceBilling?.currentAmountDue)} icon={Activity} />
+          <StatCard title="Subscription status" value={readable(serviceBilling?.subscription.serviceSubscriptionStatus)} icon={ShieldCheck} />
+          <StatCard title="Next payment date" value={formatDate(serviceBilling?.subscription.nextPaymentDate)} icon={CreditCard} />
+          <StatCard title="Total payments received" value={formatDollars(serviceBilling?.totalPaymentsReceived)} icon={CreditCard} />
           <Card>
             <CardBody>
               <p className="text-sm text-slate-500">Account health</p>
@@ -444,138 +410,87 @@ export default function HideawayHollerClientPage() {
         <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold text-slate-900">Client Billing Setup</h2>
-              <p className="text-sm text-slate-500">Configure how much Hideaway Holler owes and when invoices are due.</p>
+              <h2 className="text-lg font-semibold text-slate-900">Client Billing & Subscription</h2>
+              <p className="text-sm text-slate-500">Service and maintenance billing is calculated automatically after the subscription starts.</p>
             </CardHeader>
             <CardBody>
-              <form onSubmit={saveBillingSettings} className="space-y-4">
+              <form onSubmit={saveServiceSettings} className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Client Business Name">
-                    <input value={billingForm.businessName} onChange={(e) => setBillingForm({ ...billingForm, businessName: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                  <Summary label="Business Name" value={data?.client.name || 'Hideaway Holler'} />
+                  <Summary label="Current Plan" value={serviceBilling?.currentPlan || 'Not started'} />
+                  <Summary label="Current Monthly Fee" value={`${formatDollars(serviceBilling?.currentMonthlyFee)} + tax`} />
+                  <Summary label="Current Amount Due" value={formatDollars(serviceBilling?.currentAmountDue)} />
+                  <Summary label="Outstanding Balance" value={formatDollars(serviceBilling?.outstandingBalance)} />
+                  <Summary label="Next Payment Date" value={formatDate(serviceBilling?.subscription.nextPaymentDate)} />
+                  <Summary label="Total Invoices Generated" value={serviceBilling?.totalInvoicesGenerated ?? 0} />
+                  <Summary label="Paid / Unpaid / Past Due" value={`${serviceBilling?.paidInvoices ?? 0} / ${serviceBilling?.unpaidInvoices ?? 0} / ${serviceBilling?.pastDueInvoices ?? 0}`} />
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Tax Rate (%)">
+                    <input type="number" min={0} max={100} step={0.01} value={serviceForm.taxRate} onChange={(e) => setServiceForm({ ...serviceForm, taxRate: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="0.00" />
                   </Field>
-                  <Field label="Billing Email">
-                    <input type="email" value={billingForm.billingEmail} onChange={(e) => setBillingForm({ ...billingForm, billingEmail: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                  <Field label="Subscription Start Date">
+                    <input type="date" value={serviceForm.subscriptionStartDate} onChange={(e) => setServiceForm({ ...serviceForm, subscriptionStartDate: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                   </Field>
-                  <Field label="Setup Fee Amount ($)">
-                    <input type="number" min={0} step={0.01} value={billingForm.setupFeeAmount} onChange={(e) => setBillingForm({ ...billingForm, setupFeeAmount: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="0.00" />
+                  <Field label="Billing Day">
+                    <input type="number" min={1} max={31} value={serviceForm.billingDay} onChange={(e) => setServiceForm({ ...serviceForm, billingDay: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                   </Field>
-                  <Field label="Monthly Subscription Amount ($)">
-                    <input type="number" min={0} step={0.01} value={billingForm.monthlySubscriptionAmount} onChange={(e) => setBillingForm({ ...billingForm, monthlySubscriptionAmount: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="0.00" />
-                  </Field>
-                  <Field label="Billing Frequency">
-                    <select
-                      value={billingForm.billingFrequency}
-                      onChange={(e) => {
-                        const billingFrequency = e.target.value;
-                        setBillingForm({
-                          ...billingForm,
-                          billingFrequency,
-                          nextBillingDate: billingForm.billingStartDate ? addBillingInterval(billingForm.billingStartDate, billingFrequency) : billingForm.nextBillingDate,
-                        });
-                      }}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    >
-                      <option value="MONTHLY">Monthly</option>
-                      <option value="QUARTERLY">Quarterly</option>
-                      <option value="YEARLY">Yearly</option>
+                  <Field label="Service Subscription Status">
+                    <select value={serviceForm.serviceSubscriptionStatus} onChange={(e) => setServiceForm({ ...serviceForm, serviceSubscriptionStatus: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                      <option value="not_started">Not Started</option>
+                      <option value="active">Active</option>
+                      <option value="past_due">Past Due</option>
+                      <option value="cancelled">Cancelled</option>
                     </select>
                   </Field>
-                  <Field label="Billing Start Date">
-                    <input
-                      type="date"
-                      value={billingForm.billingStartDate}
-                      onChange={(e) => {
-                        const billingStartDate = e.target.value;
-                        setBillingForm({
-                          ...billingForm,
-                          billingStartDate,
-                          nextBillingDate: addBillingInterval(billingStartDate, billingForm.billingFrequency),
-                        });
-                      }}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    />
-                  </Field>
-                  <Field label="Next Billing Date">
-                    <input type="date" value={billingForm.nextBillingDate} onChange={(e) => setBillingForm({ ...billingForm, nextBillingDate: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                  </Field>
-                  <Field label="Payment Due Day (1-31)">
-                    <input type="number" min={1} max={31} value={billingForm.paymentDueDay} onChange={(e) => setBillingForm({ ...billingForm, paymentDueDay: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                  </Field>
-                  <Field label="Grace Period Days">
-                    <input type="number" min={0} value={billingForm.gracePeriodDays} onChange={(e) => setBillingForm({ ...billingForm, gracePeriodDays: Number(e.target.value) })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                  </Field>
-                  <Field label="Stripe Customer ID">
-                    <input value={billingForm.stripeCustomerId} onChange={(e) => setBillingForm({ ...billingForm, stripeCustomerId: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                  </Field>
-                  <Field label="Stripe Subscription ID">
-                    <input value={billingForm.stripeSubscriptionId} onChange={(e) => setBillingForm({ ...billingForm, stripeSubscriptionId: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                  </Field>
                 </div>
-                <Field label="Notes">
-                  <textarea value={billingForm.notes} onChange={(e) => setBillingForm({ ...billingForm, notes: e.target.value })} className="mt-1 min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                </Field>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="submit" loading={actionLoading === 'save-billing'}>Save Billing Settings</Button>
-                  {data?.stripe.configured && (
-                    <Button type="button" variant="outline" onClick={syncStripe} loading={actionLoading === 'sync'} disabled={!billingForm.stripeCustomerId}>
-                      Sync Stripe
-                    </Button>
-                  )}
-                  <Button type="button" variant="outline" onClick={generateSetupFeeInvoice} loading={actionLoading === 'setup-fee-invoice'} disabled={Number(billingForm.setupFeeAmount || 0) <= 0}>
-                    Generate Setup Fee Invoice
+                  <Button type="button" onClick={startService} loading={actionLoading === 'start-service-subscription'} disabled={serviceBilling?.subscription.serviceSubscriptionStatus === 'active'}>
+                    Start Service Subscription
                   </Button>
-                  <Button type="button" variant="outline" onClick={waiveSetupFee} loading={actionLoading === 'waive-setup-fee'}>
-                    Waive Setup Fee
+                  <Button type="submit" variant="outline" loading={actionLoading === 'save-service-settings'}>
+                    Edit Tax Rate
                   </Button>
-                  {data?.client.isSuspended ? (
-                    <Button type="button" variant="outline" onClick={reactivateAccount} loading={actionLoading === 'reactivate'}>
-                      Reactivate Account
-                    </Button>
-                  ) : (
-                    <Button type="button" variant="outline" onClick={suspendAccount} loading={actionLoading === 'suspend'}>
-                      Suspend Account
-                    </Button>
-                  )}
+                  <Button type="button" variant="outline" onClick={generateCurrentServiceInvoice} loading={actionLoading === 'generate-service-invoice'}>
+                    Generate Current Invoice
+                  </Button>
                 </div>
+              </form>
+
+              <form onSubmit={recordManualServicePayment} className="mt-6 space-y-3 rounded-xl border border-slate-200 p-4">
+                <h3 className="font-semibold text-slate-900">Mark Manual Payment</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Invoice">
+                    <select value={manualPaymentForm.invoiceId} onChange={(e) => setManualPaymentForm({ ...manualPaymentForm, invoiceId: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                      <option value="">Oldest unpaid invoice</option>
+                      {(serviceBilling?.invoices || []).filter((invoice) => invoice.status !== 'paid').map((invoice) => (
+                        <option key={invoice.id} value={invoice.id}>{invoice.invoiceNumber} - {formatDollars(invoice.balanceDue)} due</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Amount ($)">
+                    <input type="number" min={0.01} step={0.01} value={manualPaymentForm.amount} onChange={(e) => setManualPaymentForm({ ...manualPaymentForm, amount: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
+                  </Field>
+                  <Field label="Payment Method">
+                    <select value={manualPaymentForm.paymentMethod} onChange={(e) => setManualPaymentForm({ ...manualPaymentForm, paymentMethod: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                      <option value="manual">Manual</option>
+                      <option value="cash">Cash</option>
+                      <option value="check">Check</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="square">Square</option>
+                    </select>
+                  </Field>
+                  <Field label="Notes">
+                    <input value={manualPaymentForm.notes} onChange={(e) => setManualPaymentForm({ ...manualPaymentForm, notes: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                  </Field>
+                </div>
+                <Button type="submit" loading={actionLoading === 'manual-service-payment'}>Mark Manual Payment</Button>
               </form>
             </CardBody>
           </Card>
 
           <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <h2 className="text-lg font-semibold text-slate-900">Create Invoice</h2>
-              </CardHeader>
-              <CardBody>
-                <form onSubmit={createInvoice} className="space-y-3">
-                  <Field label="Invoice Type">
-                    <select value={invoiceForm.invoiceType} onChange={(e) => setInvoiceForm({ ...invoiceForm, invoiceType: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                      <option value="SETUP_FEE">Setup Fee</option>
-                      <option value="MONTHLY_SUBSCRIPTION">Monthly Subscription</option>
-                      <option value="CUSTOM_CHARGE">Custom Charge</option>
-                    </select>
-                  </Field>
-                  <Field label="Amount ($)">
-                    <input type="number" min={0.01} step={0.01} value={invoiceForm.amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="0.00" required />
-                  </Field>
-                  <Field label="Due Date">
-                    <input type="date" value={invoiceForm.dueDate} onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required />
-                  </Field>
-                  <Field label="Description">
-                    <input value={invoiceForm.description} onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                  </Field>
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" checked={invoiceForm.sendToClient} onChange={(e) => setInvoiceForm({ ...invoiceForm, sendToClient: e.target.checked })} />
-                    Send payment link to client
-                  </label>
-                  <Button type="submit" loading={actionLoading === 'create-invoice'}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Invoice
-                  </Button>
-                </form>
-              </CardBody>
-            </Card>
-
             <Card>
               <CardHeader><h2 className="text-lg font-semibold text-slate-900">Account Health</h2></CardHeader>
               <CardBody>
@@ -596,12 +511,12 @@ export default function HideawayHollerClientPage() {
               <CardBody>
                 {hasPayments ? (
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Summary label="Total paid to AppCreatives LLC" value={formatMoney(data?.paymentSummary.totalPaidToAppCreatives)} />
-                    <Summary label="Payments this month" value={formatMoney(data?.paymentSummary.paymentsThisMonth)} />
-                    <Summary label="Payments this year" value={formatMoney(data?.paymentSummary.paymentsThisYear)} />
-                    <Summary label="Failed payments" value={data?.paymentSummary.failedPayments ?? 0} />
-                    <Summary label="Pending invoices" value={data?.paymentSummary.pendingInvoices ?? 0} />
-                    <Summary label="Manual payments recorded" value={data?.paymentSummary.manualPaymentsRecorded ?? 0} />
+                    <Summary label="Total paid to AppCreatives LLC" value={formatDollars(serviceBilling?.totalPaymentsReceived)} />
+                    <Summary label="Tax rate" value={`${Number(serviceBilling?.subscription.taxRate || 0).toFixed(2)}%`} />
+                    <Summary label="Paid invoices" value={serviceBilling?.paidInvoices ?? 0} />
+                    <Summary label="Unpaid invoices" value={serviceBilling?.unpaidInvoices ?? 0} />
+                    <Summary label="Past due invoices" value={serviceBilling?.pastDueInvoices ?? 0} />
+                    <Summary label="Last payment date" value={formatDate(serviceBilling?.subscription.lastPaymentDate)} />
                   </div>
                 ) : (
                   <p className="text-sm text-slate-500">No payments received yet.</p>
@@ -619,54 +534,30 @@ export default function HideawayHollerClientPage() {
                 <p className="text-sm text-slate-500">No invoices created yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {(data?.invoices || []).map((invoice) => (
+                  {(serviceBilling?.invoices || []).map((invoice) => (
                     <div key={invoice.id} className="rounded-lg border border-slate-200 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <p className="font-medium text-slate-900">
-                            {invoice.invoiceNumber || 'Invoice'} — {readable(invoice.invoiceType)} — {readable(invoice.status)}
+                            {invoice.invoiceNumber} — Month {invoice.monthNumber} — {readable(invoice.status)}
                           </p>
                           <p className="mt-1 text-sm text-slate-500">
-                            {formatMoney(invoice.amountDue, invoice.currency)} due · Due {formatDate(invoice.dueDate)}
+                            {formatDollars(invoice.totalDue)} total · {formatDollars(invoice.balanceDue)} balance · Due {formatDate(invoice.dueDate)}
                           </p>
-                          {invoice.description && <p className="mt-1 text-sm text-slate-500">{invoice.description}</p>}
+                          <p className="mt-1 text-xs text-slate-500">Subtotal {formatDollars(invoice.subtotal)} + tax {formatDollars(invoice.taxAmount)} ({Number(invoice.taxRate).toFixed(2)}%)</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {(invoice.hostedInvoiceUrl || invoice.invoicePdf || invoice.stripeCheckoutUrl) && (
+                          {invoice.squareCheckoutUrl && (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => window.open(invoice.hostedInvoiceUrl || invoice.invoicePdf || invoice.stripeCheckoutUrl || '', '_blank')}
+                              onClick={() => window.open(invoice.squareCheckoutUrl || '', '_blank')}
                             >
                               View Invoice
                             </Button>
                           )}
-                          {invoice.invoicePdf && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => window.open(invoice.invoicePdf!, '_blank')}>
-                              Download Invoice
-                            </Button>
-                          )}
-                          {UNPAID_STATUSES.includes(invoice.status) && data?.stripe.configured && (
-                            <Button type="button" variant="outline" size="sm" loading={actionLoading === `send-${invoice.id}`} onClick={() => invoiceAction(invoice.id, 'send-link', `send-${invoice.id}`)}>
-                              Send Payment Link
-                            </Button>
-                          )}
-                          {UNPAID_STATUSES.includes(invoice.status) && (
-                            <Button type="button" variant="outline" size="sm" loading={actionLoading === `paid-${invoice.id}`} onClick={() => invoiceAction(invoice.id, 'mark-paid', `paid-${invoice.id}`)}>
-                              Mark Manual Payment
-                            </Button>
-                          )}
-                          {UNPAID_STATUSES.includes(invoice.status) && (
-                            <Button type="button" variant="outline" size="sm" loading={actionLoading === `waived-${invoice.id}`} onClick={() => invoiceAction(invoice.id, 'mark-waived', `waived-${invoice.id}`)}>
-                              Mark as Waived
-                            </Button>
-                          )}
-                          {invoice.status === 'DRAFT' && (
-                            <Button type="button" variant="outline" size="sm" loading={actionLoading === `delete-${invoice.id}`} onClick={() => invoiceAction(invoice.id, 'delete', `delete-${invoice.id}`)}>
-                              Delete Draft
-                            </Button>
-                          )}
+                          <Badge className={statusStyles[readable(invoice.status).toUpperCase()] || 'bg-slate-200 text-slate-700'}>{readable(invoice.status)}</Badge>
                         </div>
                       </div>
                     </div>
@@ -683,20 +574,13 @@ export default function HideawayHollerClientPage() {
                 <p className="text-sm text-slate-500">No payments received yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {(data?.payments || []).map((payment) => (
+                  {(serviceBilling?.payments || []).map((payment) => (
                     <div key={payment.id} className="rounded-lg border border-slate-200 p-3">
-                      <p className="font-medium text-slate-900">{formatMoney(payment.amount, payment.currency)} — {readable(payment.status)}</p>
+                      <p className="font-medium text-slate-900">{formatDollars(payment.amount)} — {readable(payment.paymentMethod)}</p>
                       <p className="mt-1 text-sm text-slate-500">
-                        {formatDateTime(payment.paidAt || payment.createdAt)}
-                        {payment.paymentMethod ? ` · ${readable(payment.paymentMethod)}` : ''}
+                        {formatDateTime(payment.paymentDate)}
+                        {payment.notes ? ` · ${payment.notes}` : ''}
                       </p>
-                      <div className="mt-2 flex gap-2">
-                        {payment.receiptUrl && (
-                          <Button type="button" variant="outline" size="sm" onClick={() => window.open(payment.receiptUrl!, '_blank')}>
-                            View Payment
-                          </Button>
-                        )}
-                      </div>
                     </div>
                   ))}
                 </div>

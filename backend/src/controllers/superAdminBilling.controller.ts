@@ -38,6 +38,13 @@ import {
 } from '../services/billingInvoices.service';
 import { billingSettingsPayload, ensureClientBillingSettings, saveClientBillingSettings } from '../services/billingSettings.service';
 import {
+  generateMissingServiceInvoices,
+  getServiceBillingSummary,
+  recordManualServicePayment,
+  startServiceSubscription,
+  updateServiceSubscriptionSettings,
+} from '../services/clientServiceBilling.service';
+import {
   APPCREATIVES_PAYEE_NAME,
   getDefaultBusinessAccount,
   getStripe,
@@ -117,6 +124,7 @@ export async function getSuperAdminClientDashboard(req: AuthRequest, res: Respon
   try {
     const baseAccount = await getDefaultBusinessAccount();
     const { account, settings, allInvoices } = await loadClientDashboardData(baseAccount.id);
+    const serviceBilling = await getServiceBillingSummary(account.id);
     const activeSubscription = account.subscriptions[0] || null;
     const monthStart = startOfMonth();
     const yearStart = startOfYear();
@@ -353,6 +361,7 @@ export async function getSuperAdminClientDashboard(req: AuthRequest, res: Respon
       },
       invoices: account.invoices,
       payments: account.payments,
+      serviceBilling,
       maintenanceActivity: recentMaintenance,
       leaseActivity: { activeLeases, completedLeases, pendingLeases },
       auditLogs,
@@ -434,6 +443,106 @@ export async function saveSuperAdminBillingSettings(req: AuthRequest, res: Respo
   });
 
   res.json({ account: result.account, billingSettings: billingSettingsPayload(result.settings) });
+}
+
+export async function updateSuperAdminServiceSubscriptionSettings(req: AuthRequest, res: Response) {
+  if (!requireBillingSuperAdmin(req, res)) return;
+
+  const account = await getDefaultBusinessAccount();
+  const body = req.body || {};
+  const taxRate = body.taxRate !== undefined ? Number(body.taxRate) : undefined;
+  const billingDay = body.billingDay !== undefined ? Number(body.billingDay) : undefined;
+  const serviceSubscriptionStatus = typeof body.serviceSubscriptionStatus === 'string' ? body.serviceSubscriptionStatus : undefined;
+
+  if (taxRate !== undefined && (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100)) {
+    return res.status(400).json({ error: 'Tax rate must be between 0 and 100' });
+  }
+  if (billingDay !== undefined && (!Number.isInteger(billingDay) || billingDay < 1 || billingDay > 31)) {
+    return res.status(400).json({ error: 'Billing day must be between 1 and 31' });
+  }
+  if (serviceSubscriptionStatus && !['not_started', 'active', 'past_due', 'cancelled'].includes(serviceSubscriptionStatus)) {
+    return res.status(400).json({ error: 'Invalid service subscription status' });
+  }
+
+  const subscription = await updateServiceSubscriptionSettings({
+    businessId: account.id,
+    taxRate,
+    billingDay,
+    serviceSubscriptionStatus,
+    subscriptionStartDate: body.subscriptionStartDate || null,
+  });
+
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'CLIENT_SERVICE_SUBSCRIPTION_SETTINGS_UPDATED',
+    entityType: 'ClientServiceSubscription',
+    entityId: subscription.id,
+  });
+
+  res.json({ subscription, serviceBilling: await getServiceBillingSummary(account.id) });
+}
+
+export async function startSuperAdminServiceSubscription(req: AuthRequest, res: Response) {
+  if (!requireBillingSuperAdmin(req, res)) return;
+
+  const account = await getDefaultBusinessAccount();
+  const subscription = await startServiceSubscription(account.id);
+
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'CLIENT_SERVICE_SUBSCRIPTION_STARTED',
+    entityType: 'ClientServiceSubscription',
+    entityId: subscription.id,
+  });
+
+  res.json({ subscription, serviceBilling: await getServiceBillingSummary(account.id) });
+}
+
+export async function generateSuperAdminCurrentServiceInvoice(req: AuthRequest, res: Response) {
+  if (!requireBillingSuperAdmin(req, res)) return;
+
+  const account = await getDefaultBusinessAccount();
+  const invoices = await generateMissingServiceInvoices(account.id);
+
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'CLIENT_SERVICE_INVOICES_GENERATED',
+    entityType: 'BusinessAccount',
+    entityId: account.id,
+    metadata: { generatedCount: invoices.length },
+  });
+
+  res.json({ invoices, serviceBilling: await getServiceBillingSummary(account.id) });
+}
+
+export async function recordSuperAdminManualServicePayment(req: AuthRequest, res: Response) {
+  if (!requireBillingSuperAdmin(req, res)) return;
+
+  const account = await getDefaultBusinessAccount();
+  const amount = Number(req.body.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: 'Payment amount must be greater than zero' });
+
+  const result = await recordManualServicePayment({
+    businessId: account.id,
+    invoiceId: typeof req.body.invoiceId === 'string' ? req.body.invoiceId : null,
+    amount,
+    paymentMethod: typeof req.body.paymentMethod === 'string' ? req.body.paymentMethod : 'manual',
+    notes: typeof req.body.notes === 'string' ? req.body.notes : null,
+  });
+
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'CLIENT_SERVICE_MANUAL_PAYMENT_RECORDED',
+    entityType: 'ClientPayment',
+    entityId: result.payment.id,
+    metadata: { invoiceId: result.invoice.id, amount },
+  });
+
+  res.json({ ...result, serviceBilling: await getServiceBillingSummary(account.id) });
 }
 
 export async function updateSuperAdminBusinessAccount(req: AuthRequest, res: Response) {

@@ -11,6 +11,10 @@ import { SosAlert, SosAlertStatus } from '@/lib/types';
 
 const ACTIVE_STATUSES: SosAlertStatus[] = ['ACTIVE', 'NEEDS_HELP'];
 
+type SuperAdminSosAlert = SosAlert & {
+  business?: { name?: string | null } | null;
+};
+
 function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleString() : 'Not recorded';
 }
@@ -21,6 +25,10 @@ function locationLabel(alert: SosAlert) {
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
   if (latitude == null || longitude == null) return 'Location unavailable';
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+function cityStateLabel(alert: SosAlert) {
+  return [alert.city, alert.state].filter(Boolean).join(', ') || 'Not available';
 }
 
 function secondsBetween(start?: string | null, end?: string | null) {
@@ -62,13 +70,14 @@ function StatCard({ title, value, icon: Icon }: { title: string; value: string |
 export default function SuperAdminSosLogsPage() {
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
 
   useEffect(() => {
-    api<{ alerts: SosAlert[] }>('/admin/sos/history', { suppressErrorLog: true })
+    api<{ alerts: SuperAdminSosAlert[] }>('/super-admin/sos-logs', { suppressErrorLog: true })
       .then((data) => setAlerts(data.alerts))
-      .catch((err) => console.error('[super-admin-sos-logs] Failed to load SOS records', err))
+      .catch(() => setLoadError('Unable to load SOS records. Please refresh or contact support.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -113,17 +122,10 @@ export default function SuperAdminSosLogsPage() {
           <Card>
             <CardHeader>
               <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
-              <p className="text-sm text-slate-500">Business filtering and exports can be added when there are multiple managed businesses.</p>
+              <p className="text-sm text-slate-500">Filter emergency records by status or created date.</p>
             </CardHeader>
             <CardBody>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="text-sm font-medium text-slate-700">
-                  Business
-                  <select className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" disabled>
-                    <option>All businesses</option>
-                    <option>Hideaway Holler</option>
-                  </select>
-                </label>
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-sm font-medium text-slate-700">
                   Status
                   <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
@@ -149,7 +151,9 @@ export default function SuperAdminSosLogsPage() {
               <p className="text-sm text-slate-500">Showing {filteredAlerts.length} record{filteredAlerts.length === 1 ? '' : 's'}.</p>
             </CardHeader>
             <CardBody>
-              {loading ? (
+              {loadError ? (
+                <p className="text-sm font-semibold text-red-700">{loadError}</p>
+              ) : loading ? (
                 <p className="text-sm text-slate-500">Loading SOS records...</p>
               ) : filteredAlerts.length === 0 ? (
                 <p className="text-sm text-slate-500">No SOS records match the current filters.</p>
@@ -161,26 +165,34 @@ export default function SuperAdminSosLogsPage() {
                         <th className="px-3 py-2">Resident</th>
                         <th className="px-3 py-2">Business</th>
                         <th className="px-3 py-2">Type</th>
+                        <th className="px-3 py-2">Message</th>
                         <th className="px-3 py-2">Status</th>
                         <th className="px-3 py-2">Created</th>
                         <th className="px-3 py-2">Acknowledged by</th>
+                        <th className="px-3 py-2">Acknowledged time</th>
                         <th className="px-3 py-2">Resolved by</th>
+                        <th className="px-3 py-2">Resolved time</th>
                         <th className="px-3 py-2">Response time</th>
                         <th className="px-3 py-2">Location</th>
+                        <th className="px-3 py-2">City / State</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredAlerts.map((alert) => (
                         <tr key={alert.id} className="align-top">
                           <td className="px-3 py-3 font-medium text-slate-900">{alert.residentName}</td>
-                          <td className="px-3 py-3 text-slate-600">Hideaway Holler</td>
+                          <td className="px-3 py-3 text-slate-600">{(alert as SuperAdminSosAlert).business?.name || 'Hideaway Holler'}</td>
                           <td className="px-3 py-3 text-slate-600">{alert.isTest ? 'TEST ' : ''}{alert.emergencyType || 'SOS'}</td>
+                          <td className="px-3 py-3 text-slate-600">{alert.message || 'Not recorded'}</td>
                           <td className="px-3 py-3"><Badge className={statusStyle(alert.status)}>{alert.status.replace('_', ' ')}</Badge></td>
                           <td className="px-3 py-3 text-slate-600">{formatDate(alert.createdAt)}</td>
                           <td className="px-3 py-3 text-slate-600">{alert.adminAcknowledgedBy || 'Not recorded'}</td>
+                          <td className="px-3 py-3 text-slate-600">{formatDate(alert.adminAcknowledgedAt)}</td>
                           <td className="px-3 py-3 text-slate-600">{alert.resolvedBy || 'Not recorded'}</td>
+                          <td className="px-3 py-3 text-slate-600">{formatDate(alert.resolvedAt)}</td>
                           <td className="px-3 py-3 text-slate-600">{responseLabel(alert)}</td>
                           <td className="px-3 py-3 text-slate-600">{locationLabel(alert)}</td>
+                          <td className="px-3 py-3 text-slate-600">{cityStateLabel(alert)}</td>
                         </tr>
                       ))}
                     </tbody>

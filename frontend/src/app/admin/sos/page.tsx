@@ -7,8 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-import { api, apiUrl } from '@/lib/api';
-import { getStoredToken } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { SosAlert, SosAlertStatus } from '@/lib/types';
 
 const ACTIVE_STATUSES: SosAlertStatus[] = ['ACTIVE', 'ACKNOWLEDGED', 'NEEDS_HELP'];
@@ -33,7 +32,7 @@ function mapUrl(alert: SosAlert) {
   const latitude = alert.currentLatitude ?? alert.initialLatitude;
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
   if (latitude == null || longitude == null) return null;
-  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  return `https://www.google.com/maps?q=${latitude},${longitude}`;
 }
 
 function locationLabel(alert: SosAlert) {
@@ -44,30 +43,35 @@ function locationLabel(alert: SosAlert) {
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 }
 
+function houseAssignmentLabel(alert: SosAlert) {
+  const assignment = alert.assignment || '';
+  if (!assignment || /room|bed|building/i.test(assignment)) return 'House assignment pending';
+  return assignment;
+}
+
+function cityStateLabel(alert: SosAlert) {
+  return [alert.city, alert.state].filter(Boolean).join(', ') || 'Not available';
+}
+
+function trackingLabel(alert: SosAlert) {
+  return alert.trackingActive || (alert.locationHistory?.length ?? 0) > 0 ? 'Active' : 'Off';
+}
+
 export default function AdminSosCenter() {
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [actionId, setActionId] = useState<string | null>(null);
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
 
   const loadAlerts = useCallback(async () => {
     try {
-      const token = getStoredToken();
-      if (!token) return;
-
-      const res = await fetch(`${apiUrl}/admin/sos/active`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      });
-
-      if (!res.ok) {
-        console.warn('[sos-admin] Active SOS poll returned non-ok status', { status: res.status });
-        return;
-      }
-
-      const data = (await res.json()) as { alerts: SosAlert[]; count: number };
+      setLoadError('');
+      const data = await api<{ alerts: SosAlert[]; count: number }>('/admin/sos/active', { suppressErrorLog: true });
       setAlerts(data.alerts);
     } catch (err) {
-      console.warn('[sos-admin] Failed to load SOS alerts', err);
+      if (process.env.NODE_ENV !== 'production') console.warn('[sos-admin] Failed to load SOS alerts', err);
+      setLoadError('Unable to reach SOS service. Please refresh or contact support.');
     } finally {
       setLoading(false);
     }
@@ -75,7 +79,7 @@ export default function AdminSosCenter() {
 
   useEffect(() => {
     loadAlerts();
-    const timer = setInterval(loadAlerts, 5000);
+    const timer = setInterval(loadAlerts, 3000);
     return () => clearInterval(timer);
   }, [loadAlerts]);
 
@@ -89,17 +93,32 @@ export default function AdminSosCenter() {
     document.title = 'Emergency / SOS Center - HollerHub';
   }, [activeAlerts.length]);
 
+  const latestActiveAlert = activeAlerts[0] || null;
+
   const adminAction = async (alert: SosAlert, action: 'ACKNOWLEDGE' | 'RESOLVE') => {
     setActionId(`${alert.id}:${action}`);
+    setActionStatus(action === 'ACKNOWLEDGE' ? 'Acknowledging SOS...' : 'Resolving SOS...');
     try {
-      const data = await api<{ alert: SosAlert }>(
-        action === 'ACKNOWLEDGE' ? `/admin/sos/${alert.id}/acknowledge` : `/sos/${alert.id}/admin`,
+      const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; success?: boolean }>(
+        action === 'ACKNOWLEDGE' ? `/admin/sos/${alert.id}/acknowledge` : `/admin/sos/${alert.id}/resolve`,
         {
-          method: action === 'ACKNOWLEDGE' ? 'POST' : 'PATCH',
-          body: action === 'ACKNOWLEDGE' ? undefined : { action },
+          method: 'POST',
         }
       );
-      setAlerts((current) => (action === 'RESOLVE' ? current.filter((item) => item.id !== alert.id) : current.map((item) => (item.id === alert.id ? data.alert : item))));
+      const nextAlert = data.alert || data.sosAlert;
+      if (!nextAlert?.id) throw new Error('Backend did not return the updated SOS alert.');
+
+      setAlerts((current) => (action === 'RESOLVE' ? current.filter((item) => item.id !== nextAlert.id) : current.map((item) => (item.id === nextAlert.id ? nextAlert : item))));
+      setActionStatus(action === 'ACKNOWLEDGE' ? 'SOS acknowledged.' : 'SOS resolved.');
+      await loadAlerts();
+    } catch (err) {
+      setActionStatus(
+        err instanceof Error && err.message.includes('Insufficient permissions')
+          ? 'You do not have permission to manage this SOS alert.'
+          : action === 'ACKNOWLEDGE'
+            ? 'Failed to acknowledge SOS.'
+            : 'Failed to resolve SOS.'
+      );
     } finally {
       setActionId(null);
     }
@@ -127,7 +146,35 @@ export default function AdminSosCenter() {
             </div>
           )}
 
-          {loading ? (
+          {actionStatus && (
+            <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-800 shadow-sm">
+              {actionStatus}
+            </div>
+          )}
+
+          {process.env.NODE_ENV !== 'production' && latestActiveAlert && (
+            <details className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-800">Show SOS diagnostics</summary>
+              <p className="mt-2 text-xs text-slate-600">Use these controls only to verify API actions outside the notification modal.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <Button variant="outline" loading={actionId === `${latestActiveAlert.id}:ACKNOWLEDGE`} disabled={!!latestActiveAlert.adminAcknowledgedAt} onClick={() => adminAction(latestActiveAlert, 'ACKNOWLEDGE')}>
+                  Test acknowledge latest active SOS
+                </Button>
+                <Button variant="outline" loading={actionId === `${latestActiveAlert.id}:RESOLVE`} onClick={() => adminAction(latestActiveAlert, 'RESOLVE')}>
+                  Test resolve latest active SOS
+                </Button>
+              </div>
+            </details>
+          )}
+
+          {loadError ? (
+            <Card>
+              <CardBody className="space-y-3">
+                <p className="text-sm font-semibold text-red-700">{loadError}</p>
+                <Button variant="outline" onClick={loadAlerts}>Retry SOS check</Button>
+              </CardBody>
+            </Card>
+          ) : loading ? (
             <Card>
               <CardBody>
                 <p className="text-sm text-slate-500">Loading SOS alerts...</p>
@@ -160,7 +207,7 @@ export default function AdminSosCenter() {
                             <h2 className="text-lg font-bold text-slate-950">{alert.residentName}</h2>
                             <Badge className={statusClass[alert.status]}>{alert.status.replace('_', ' ')}</Badge>
                           </div>
-                          <p className="mt-1 text-sm text-slate-600">{alert.assignment || 'No room assignment recorded'}</p>
+                          <p className="mt-1 text-sm text-slate-600">House Assignment: {houseAssignmentLabel(alert)}</p>
                         </div>
                         <p className="text-sm font-medium text-slate-700">{formatDate(alert.createdAt)}</p>
                       </div>
@@ -184,12 +231,16 @@ export default function AdminSosCenter() {
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nearby landmark</p>
                           <p className="mt-1 font-medium text-slate-900">{alert.landmark || 'Not available'}</p>
                         </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">City / State</p>
+                          <p className="mt-1 font-medium text-slate-900">{cityStateLabel(alert)}</p>
+                        </div>
                       </div>
 
                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <div className="grid gap-2 text-sm text-slate-700 md:grid-cols-3">
                           <p><span className="font-semibold">Acknowledged:</span> {formatDate(alert.adminAcknowledgedAt)}</p>
-                          <p><span className="font-semibold">Tracking:</span> {alert.trackingActive ? 'Active' : 'Off'}</p>
+                          <p><span className="font-semibold">Tracking:</span> {trackingLabel(alert)}</p>
                           <p><span className="font-semibold">Location updates:</span> {alert.locationHistory?.length ?? 0}</p>
                         </div>
                       </div>

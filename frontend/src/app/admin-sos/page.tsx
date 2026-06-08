@@ -14,23 +14,6 @@ const ACTIVE_STATUSES: SosAlertStatus[] = ['ACTIVE', 'ACKNOWLEDGED', 'NEEDS_HELP
 const UNACKNOWLEDGED_STATUSES: SosAlertStatus[] = ['ACTIVE', 'NEEDS_HELP'];
 const SOS_SOUND_ENABLED_KEY = 'sosSoundEnabled';
 const SOS_POLL_INTERVAL_MS = 2000;
-const MOBILE_PUSH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOBILE_SOS_PUSH === 'true';
-
-type AdminDevice = {
-  id: string;
-  enabled: boolean;
-  endpoint: string;
-  deviceLabel?: string;
-  updatedAt: string;
-};
-
-type DeviceResponse = {
-  device: AdminDevice;
-};
-
-type DevicesResponse = {
-  devices: AdminDevice[];
-};
 
 function formatDate(value?: string) {
   if (!value) return 'Not recorded';
@@ -44,7 +27,7 @@ function mapUrl(alert: SosAlert) {
   const latitude = alert.currentLatitude ?? alert.initialLatitude;
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
   if (latitude == null || longitude == null) return null;
-  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  return `https://www.google.com/maps?q=${latitude},${longitude}`;
 }
 
 function coords(alert: SosAlert) {
@@ -52,6 +35,16 @@ function coords(alert: SosAlert) {
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
   if (latitude == null || longitude == null) return 'Location unavailable';
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+function houseAssignmentLabel(alert: SosAlert) {
+  const assignment = alert.assignment || '';
+  if (!assignment || /room|bed|building/i.test(assignment)) return 'House assignment pending';
+  return assignment;
+}
+
+function trackingLabel(alert: SosAlert) {
+  return alert.trackingActive || (alert.locationHistory?.length ?? 0) > 0 ? 'Active' : 'Off';
 }
 
 function isMobileDevice() {
@@ -71,27 +64,6 @@ function statusClass(status: SosAlertStatus) {
   return 'bg-slate-100 text-slate-700';
 }
 
-function base64UrlToUint8Array(base64Url: string) {
-  const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
-  const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = window.atob(base64);
-  const output = new Uint8Array(raw.length);
-
-  for (let i = 0; i < raw.length; i += 1) {
-    output[i] = raw.charCodeAt(i);
-  }
-
-  return output;
-}
-
-function deviceLabel() {
-  if (typeof navigator === 'undefined') return 'Admin SOS phone';
-  const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/i.test(ua)) return 'Admin iOS SOS device';
-  if (/Android/i.test(ua)) return 'Admin Android SOS device';
-  return 'Admin SOS browser device';
-}
-
 function AdminSosConsole() {
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [history, setHistory] = useState<SosAlert[]>([]);
@@ -101,9 +73,8 @@ function AdminSosConsole() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [soundBlocked, setSoundBlocked] = useState(false);
   const [soundStatus, setSoundStatus] = useState('Emergency sound is not armed on this device.');
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [settings, setSettings] = useState<SosSettings>(DEFAULT_SOS_SETTINGS);
-  const [device, setDevice] = useState<AdminDevice | null>(null);
-  const [pushStatus, setPushStatus] = useState('Push notifications are not enabled on this device.');
   const [mobileDevice, setMobileDevice] = useState(false);
   const seenUnacknowledgedIdsRef = useRef<Set<string>>(new Set());
   const deepLinkedAlertIdRef = useRef<string | null>(null);
@@ -129,22 +100,6 @@ function AdminSosConsole() {
     }
   }, []);
 
-  const loadDevices = useCallback(async () => {
-    if (!MOBILE_PUSH_ENABLED) {
-      setPushStatus('Mobile SOS notifications are planned for a future upgrade. Use the computer dashboard for SOS sound alerts.');
-      return;
-    }
-    try {
-      const res = await api<DevicesResponse>('/admin-devices', { suppressErrorLog: true });
-      setDevice(res.devices[0] || null);
-      if (res.devices[0]?.enabled) {
-        setPushStatus('SOS push notifications are enabled for this device.');
-      }
-    } catch (err) {
-      console.warn('[admin-sos-pwa] Failed to load admin devices', err);
-    }
-  }, []);
-
   const loadSettings = useCallback(async () => {
     try {
       const res = await api<{ settings: SosSettings }>('/sos-settings', { suppressErrorLog: true });
@@ -157,7 +112,6 @@ function AdminSosConsole() {
 
   useEffect(() => {
     loadAlerts();
-    if (MOBILE_PUSH_ENABLED) loadDevices();
     loadSettings();
     const timer = setInterval(loadAlerts, SOS_POLL_INTERVAL_MS);
 
@@ -170,15 +124,15 @@ function AdminSosConsole() {
       window.removeEventListener('focus', refreshNow);
       document.removeEventListener('visibilitychange', refreshNow);
     };
-  }, [loadAlerts, loadDevices, loadSettings]);
+  }, [loadAlerts, loadSettings]);
 
   useEffect(() => {
     document.title = activeAlerts.length > 0 ? `SOS ACTIVE (${activeAlerts.length})` : 'Hideaway Holler SOS';
   }, [activeAlerts.length]);
 
   useEffect(() => {
-    getSosAudio();
-  }, []);
+    if (!mobileDevice) getSosAudio();
+  }, [mobileDevice]);
 
   useEffect(() => {
     const currentIds = new Set(sirenAlerts.map((alert) => alert.id));
@@ -213,7 +167,11 @@ function AdminSosConsole() {
       setSoundBlocked(false);
       setSoundEnabled(true);
       setSoundStatus('Sound armed on this device');
-      localStorage.setItem(SOS_SOUND_ENABLED_KEY, 'true');
+      try {
+        localStorage.setItem(SOS_SOUND_ENABLED_KEY, 'true');
+      } catch {
+        // Ignore storage failures in private/mobile browser modes.
+      }
       return;
     }
 
@@ -226,7 +184,11 @@ function AdminSosConsole() {
     setSoundEnabled(false);
     setSoundBlocked(false);
     setSoundStatus('Emergency sound is muted on this device.');
-    localStorage.removeItem(SOS_SOUND_ENABLED_KEY);
+    try {
+      localStorage.removeItem(SOS_SOUND_ENABLED_KEY);
+    } catch {
+      // Ignore storage failures in private/mobile browser modes.
+    }
   };
 
   const testSiren = async () => {
@@ -257,70 +219,23 @@ function AdminSosConsole() {
   };
 
   useEffect(() => {
-    setMobileDevice(isMobileDevice());
-    if (typeof window !== 'undefined' && localStorage.getItem(SOS_SOUND_ENABLED_KEY) === 'true') {
-      setSoundEnabled(true);
-      setSoundStatus('Sound armed on this device');
+    const mobile = isMobileDevice();
+    setMobileDevice(mobile);
+    if (!mobile && typeof window !== 'undefined') {
+      try {
+        if (localStorage.getItem(SOS_SOUND_ENABLED_KEY) === 'true') {
+          setSoundEnabled(true);
+          setSoundStatus('Sound armed on this device');
+        }
+      } catch {
+        setSoundEnabled(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     return () => stopSosSound();
   }, []);
-
-  const enablePush = async () => {
-    if (!MOBILE_PUSH_ENABLED) {
-      setPushStatus('Mobile SOS notifications are planned for a future upgrade. Use the computer dashboard for SOS sound alerts.');
-      return;
-    }
-    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-      setPushStatus('This browser does not support installable push notifications.');
-      return;
-    }
-
-    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!vapidPublicKey) {
-      setPushStatus('Push notifications are not configured. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY in Vercel.');
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      setPushStatus('Notification permission was not granted on this device.');
-      return;
-    }
-
-    const registration = await navigator.serviceWorker.ready;
-    const subscription =
-      (await registration.pushManager.getSubscription()) ||
-      (await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
-      }));
-
-    const res = await api<DeviceResponse>('/admin-devices', {
-      method: 'POST',
-      body: {
-        subscription: subscription.toJSON(),
-        deviceLabel: deviceLabel(),
-        enabled: true,
-      },
-    });
-
-    setDevice(res.device);
-    setPushStatus('SOS push notifications are enabled for this device.');
-  };
-
-  const setDeviceEnabled = async (enabled: boolean) => {
-    if (!MOBILE_PUSH_ENABLED) return;
-    if (!device) return;
-    const res = await api<DeviceResponse>('/admin-devices', {
-      method: 'PATCH',
-      body: { id: device.id, enabled },
-    });
-    setDevice(res.device);
-    setPushStatus(enabled ? 'SOS push notifications are enabled for this device.' : 'SOS push notifications are disabled for this device.');
-  };
 
   const selectAlert = useCallback(async (alert: SosAlert) => {
     setSelectedAlertId(alert.id);
@@ -357,19 +272,30 @@ function AdminSosConsole() {
 
   const adminAction = async (alert: SosAlert, action: 'ACKNOWLEDGE' | 'RESOLVE') => {
     setActionId(`${alert.id}:${action}`);
+    setActionStatus(action === 'ACKNOWLEDGE' ? 'Acknowledging SOS...' : 'Resolving SOS...');
     try {
-      const data = await api<{ alert: SosAlert }>(
-        action === 'ACKNOWLEDGE' ? `/admin/sos/${alert.id}/acknowledge` : `/sos/${alert.id}/admin`,
+      const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; success?: boolean }>(
+        action === 'ACKNOWLEDGE' ? `/admin/sos/${alert.id}/acknowledge` : `/admin/sos/${alert.id}/resolve`,
         {
-          method: action === 'ACKNOWLEDGE' ? 'POST' : 'PATCH',
-          body: action === 'ACKNOWLEDGE' ? undefined : { action },
+          method: 'POST',
         }
       );
+      const nextAlert = data.alert || data.sosAlert;
+      if (!nextAlert?.id) throw new Error('Backend did not return the updated SOS alert.');
       setAlerts((current) =>
-        action === 'RESOLVE' ? current.filter((item) => item.id !== alert.id) : current.map((item) => (item.id === alert.id ? data.alert : item))
+        action === 'RESOLVE' ? current.filter((item) => item.id !== nextAlert.id) : current.map((item) => (item.id === nextAlert.id ? nextAlert : item))
       );
+      setActionStatus(action === 'ACKNOWLEDGE' ? 'SOS acknowledged.' : 'SOS resolved.');
       stopSosSound();
       void loadAlerts();
+    } catch (err) {
+      setActionStatus(
+        err instanceof Error && err.message.includes('Insufficient permissions')
+          ? 'You do not have permission to manage this SOS alert.'
+          : action === 'ACKNOWLEDGE'
+            ? 'Failed to acknowledge SOS.'
+            : 'Failed to resolve SOS.'
+      );
     } finally {
       setActionId(null);
     }
@@ -403,15 +329,9 @@ function AdminSosConsole() {
                   </Button>
                 </>
               )}
-              {MOBILE_PUSH_ENABLED && (
-                <Button variant={device?.enabled ? 'secondary' : 'danger'} onClick={device?.enabled ? () => setDeviceEnabled(false) : enablePush}>
-                  {device?.enabled ? 'Disable Push' : 'Enable Push'}
-                </Button>
-              )}
             </div>
           </div>
           <div className="mt-4 grid gap-2 text-sm text-red-100 md:grid-cols-2">
-            {MOBILE_PUSH_ENABLED && <p>{pushStatus}</p>}
             <p>{soundBlocked ? soundStatus : soundEnabled ? `Sound armed on this device: ${settings.sound.label}` : soundStatus}</p>
           </div>
           <div className="mt-4 rounded-md border border-red-400/40 bg-red-900/40 p-3 text-sm font-semibold text-red-50">
@@ -432,6 +352,8 @@ function AdminSosConsole() {
             </div>
           </section>
         )}
+
+        {actionStatus && <section className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm font-semibold text-white">{actionStatus}</section>}
 
         {loading ? (
           <section className="rounded-lg border border-zinc-800 bg-zinc-900 p-5 text-zinc-300">Loading emergency alerts...</section>
@@ -478,7 +400,7 @@ function AdminSosConsole() {
                         <h2 className="text-xl font-black">{alert.residentName}</h2>
                         <Badge className={statusClass(alert.status)}>{alert.status.replace('_', ' ')}</Badge>
                       </div>
-                      <p className="mt-1 text-sm font-medium text-slate-600">{alert.assignment || 'No assignment recorded'}</p>
+                      <p className="mt-1 text-sm font-medium text-slate-600">House Assignment: {houseAssignmentLabel(alert)}</p>
                     </div>
                     <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                       <Clock className="h-4 w-4" />
@@ -502,6 +424,10 @@ function AdminSosConsole() {
                     <div>
                       <p className="font-bold uppercase text-slate-500">Nearby landmark</p>
                       <p className="mt-1">{alert.landmark || 'Not available'}</p>
+                    </div>
+                    <div>
+                      <p className="font-bold uppercase text-slate-500">Tracking</p>
+                      <p className="mt-1">{trackingLabel(alert)}</p>
                     </div>
                   </div>
 

@@ -28,9 +28,12 @@ import { DashboardStats } from '@/lib/types';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    api<{ stats: DashboardStats }>('/dashboard/admin').then((d) => setStats(d.stats)).catch(console.error);
+    api<{ stats: DashboardStats }>('/dashboard/admin')
+      .then((d) => setStats(d.stats))
+      .catch(() => setLoadError('Unable to load dashboard metrics. Please refresh or sign in again.'));
   }, []);
 
   return (
@@ -41,6 +44,7 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-bold text-slate-900">Admin dashboard</h1>
             <p className="mt-1 text-slate-600">Hideaway Holler operations overview</p>
           </div>
+          {loadError && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{loadError}</p>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <Link href="/admin/sos" className="block rounded-xl ring-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2">

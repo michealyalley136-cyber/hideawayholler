@@ -57,7 +57,7 @@ export default function AdminSosSettingsPage() {
         body: {
           soundKey: settings.soundKey,
           continuousAlarmEnabled: settings.continuousAlarmEnabled,
-          browserNotificationsEnabled: settings.browserNotificationsEnabled,
+          browserNotificationsEnabled: false,
           escalation: settings.escalation,
         },
       });
@@ -88,7 +88,7 @@ export default function AdminSosSettingsPage() {
                 </div>
                 <div>
                   <h2 className="font-semibold text-slate-900">SOS Settings Card</h2>
-                  <p className="text-sm text-slate-500">Predefined sounds only. Custom uploads are disabled.</p>
+                  <p className="text-sm text-slate-500">Configure the desktop admin siren used by the emergency responder dashboard.</p>
                 </div>
               </div>
             </CardHeader>
@@ -129,43 +129,9 @@ export default function AdminSosSettingsPage() {
                     <span className="text-sm text-slate-600">Loop the selected alarm until the SOS is acknowledged.</span>
                   </span>
                 </label>
-                <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <input
-                    type="checkbox"
-                    checked={settings.browserNotificationsEnabled}
-                    onChange={(event) => update({ browserNotificationsEnabled: event.target.checked })}
-                    className="mt-1 h-4 w-4"
-                  />
-                  <span>
-                    <span className="block font-medium text-slate-900">Browser Notifications</span>
-                    <span className="text-sm text-slate-600">Send web push notifications to active admin devices.</span>
-                  </span>
-                </label>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700">SMS fallback after seconds</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={3600}
-                    value={settings.escalation.smsFallbackAfterSeconds}
-                    onChange={(event) => update({ escalation: { ...settings.escalation, smsFallbackAfterSeconds: Number(event.target.value) } })}
-                    className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700">Backup admin after seconds</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={7200}
-                    value={settings.escalation.backupAdminAfterSeconds}
-                    onChange={(event) => update({ escalation: { ...settings.escalation, backupAdminAfterSeconds: Number(event.target.value) } })}
-                    className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
-                </label>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Mobile/background push notifications are planned for a future upgrade. For this demo, SOS delivery uses dashboard polling and desktop siren alerts only.
+                </div>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

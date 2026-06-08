@@ -83,7 +83,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               { href: '/weather', label: 'Weather', icon: CloudSun },
               { href: '/notices', label: 'Notices', icon: Bell },
               { href: '/internet', label: 'Wi-Fi', icon: Wifi },
-              { href: '/emergency-alerts', label: 'Alerts', icon: AlertTriangle },
+              { href: '/dashboard/emergency-sos', label: 'SOS', icon: AlertTriangle },
               { href: '/maintenance', label: 'Fix', icon: Wrench },
             ].map((item) => {
               const active = pathname === item.href;

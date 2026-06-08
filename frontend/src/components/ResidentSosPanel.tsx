@@ -15,13 +15,15 @@ const ACTIVE_TRACKING_DELAY_MS = 60000;
 const LOCATION_UPDATE_MS = 12000;
 const LOCATION_TIMEOUT_MS = 5000;
 
+type SosUiState = 'idle' | 'holding' | 'sending' | 'active' | 'failed' | 'cancelled' | 'resolved';
+
 function isActiveSos(alert?: SosAlert | null): alert is SosAlert {
   return !!alert && ['ACTIVE', 'ACKNOWLEDGED', 'NEEDS_HELP'].includes(alert.status);
 }
 
 function getCurrentLocation() {
   return new Promise<GeolocationPosition | null>((resolve) => {
-    if (!navigator.geolocation) {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined' || !navigator.geolocation) {
       resolve(null);
       return;
     }
@@ -47,39 +49,54 @@ function getCurrentLocation() {
 
 export function ResidentSosPanel() {
   const [alert, setAlert] = useState<SosAlert | null>(null);
+  const [sosState, setSosState] = useState<SosUiState>('idle');
   const [holdProgress, setHoldProgress] = useState(0);
-  const [isHolding, setIsHolding] = useState(false);
-  const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [lastSosId, setLastSosId] = useState<string | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const trackingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const alertRef = useRef<SosAlert | null>(null);
   const triggeredRef = useRef(false);
+  const hadActiveSosRef = useRef(false);
+
+  const isHolding = sosState === 'holding';
+  const isSending = sosState === 'sending';
 
   useEffect(() => {
     alertRef.current = alert;
+    const status = alert?.status;
+    if (isActiveSos(alert)) {
+      hadActiveSosRef.current = true;
+      setSosState('active');
+    } else if (status === 'SAFE' || status === 'RESOLVED') {
+      setSosState('resolved');
+    }
   }, [alert]);
 
-  const stopHold = useCallback(() => {
+  const clearHoldTimers = useCallback(() => {
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
     if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     holdTimerRef.current = null;
     progressTimerRef.current = null;
+  }, []);
+
+  const stopHold = useCallback(() => {
+    clearHoldTimers();
     if (isHolding && !triggeredRef.current) {
-      console.info('[sos resident] SOS hold canceled');
-      setMessage('SOS canceled. Hold for 3 seconds to send.');
+      if (process.env.NODE_ENV !== 'production') console.info('[sos resident] SOS hold canceled');
+      setSosState('cancelled');
+      setMessage('SOS cancelled.');
     }
-    setIsHolding(false);
     setHoldProgress(0);
-  }, [isHolding]);
+  }, [clearHoldTimers, isHolding]);
 
   const refreshActiveAlert = useCallback(async () => {
     try {
       const data = await api<{ alert: SosAlert | null }>('/sos/active', { suppressErrorLog: true });
       setAlert(data.alert);
     } catch (err) {
-      console.warn('[sos] Failed to refresh active alert', err);
+      if (process.env.NODE_ENV !== 'production') console.warn('[sos] Failed to refresh active alert', err);
     }
   }, []);
 
@@ -126,13 +143,16 @@ export function ResidentSosPanel() {
       setAlert(data.alert);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
-        setAlert(null);
-        setMessage('SOS tracking has stopped because this alert is no longer active.');
+        if (hadActiveSosRef.current && sosState === 'active') {
+          setAlert(null);
+          setSosState('resolved');
+          setMessage('GPS tracking has stopped because this alert is no longer active.');
+        }
         return;
       }
-      console.warn('[sos] Failed to share location update', err);
+      if (process.env.NODE_ENV !== 'production') console.warn('[sos] Failed to share location update', err);
     }
-  }, []);
+  }, [sosState]);
 
   useEffect(() => {
     if (trackingTimerRef.current) {
@@ -152,16 +172,12 @@ export function ResidentSosPanel() {
   }, [sendLocationUpdate, shouldTrack]);
 
   const triggerSos = useCallback(async () => {
-    console.info('[sos resident] SOS hold completed');
+    if (process.env.NODE_ENV !== 'production') console.info('[sos resident] SOS hold completed');
     triggeredRef.current = true;
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    holdTimerRef.current = null;
-    progressTimerRef.current = null;
-    setIsHolding(false);
+    clearHoldTimers();
     setHoldProgress(100);
-    setIsSending(true);
-    setMessage('SOS trigger started. Sending SOS alert...');
+    setSosState('sending');
+    setMessage('Sending SOS alert...');
 
     try {
       const position = await getCurrentLocation();
@@ -175,32 +191,36 @@ export function ResidentSosPanel() {
         message: position ? 'Resident triggered SOS from portal.' : 'Resident triggered SOS from portal. Location unavailable.',
         streetAddress: position ? undefined : 'Location unavailable',
       };
-      console.info('[sos resident] SOS API request sent', payload);
+      if (process.env.NODE_ENV !== 'production') console.info('[sos resident] SOS API request sent', payload);
       const data = await api<{ success?: boolean; alert?: SosAlert; sosAlert?: SosAlert; message?: string }>('/sos/trigger', {
         method: 'POST',
         body: payload,
       });
       const nextAlert = data.alert || data.sosAlert || null;
+      if (nextAlert?.id) setLastSosId(nextAlert.id);
       if (nextAlert && 'residentId' in nextAlert) setAlert(nextAlert);
-      console.info('[sos resident] SOS backend response', data);
-      setMessage(data.message || 'SOS sent successfully. Admin has been notified.');
+      if (process.env.NODE_ENV !== 'production') console.info('[sos resident] SOS backend response', data);
+      hadActiveSosRef.current = true;
+      setSosState('active');
+      setMessage(data.message || 'SOS sent successfully. Admin has been alerted.');
     } catch (err) {
-      console.error('[sos] Failed to trigger SOS', err);
-      setMessage(`SOS failed: ${err instanceof ApiError ? err.message : 'Unable to send alert. Please call 911 if this is an emergency.'}`);
+      if (process.env.NODE_ENV !== 'production') console.error('[sos] Failed to trigger SOS', err);
+      setSosState('failed');
+      setMessage('SOS failed to send. Please try again or call 911 immediately.');
     } finally {
-      setIsSending(false);
       triggeredRef.current = false;
     }
-  }, []);
+  }, [clearHoldTimers]);
 
   const startHold = useCallback((event?: { preventDefault?: () => void }) => {
     event?.preventDefault?.();
-    if (isSending || isActiveSos(alert)) return;
-    console.info('[sos resident] SOS hold started');
+    if (isSending || isHolding || holdTimerRef.current || isActiveSos(alert)) return;
+    if (process.env.NODE_ENV !== 'production') console.info('[sos resident] SOS hold started');
     triggeredRef.current = false;
-    stopHold();
-    setMessage('Hold to trigger SOS...');
-    setIsHolding(true);
+    clearHoldTimers();
+    setHoldProgress(0);
+    setSosState('holding');
+    setMessage('Keep holding to send SOS.');
     const startedAt = Date.now();
 
     progressTimerRef.current = setInterval(() => {
@@ -208,7 +228,7 @@ export function ResidentSosPanel() {
     }, 50);
 
     holdTimerRef.current = setTimeout(triggerSos, HOLD_MS);
-  }, [alert, isSending, stopHold, triggerSos]);
+  }, [alert, clearHoldTimers, isHolding, isSending, triggerSos]);
 
   const cancelHold = useCallback((event?: { preventDefault?: () => void }) => {
     event?.preventDefault?.();
@@ -217,14 +237,18 @@ export function ResidentSosPanel() {
 
   const residentAction = async (action: 'SAFE' | 'NEEDS_HELP' | 'KEEP_ACTIVE') => {
     if (!alert) return;
-    const data = await api<{ alert: SosAlert }>(`/sos/${alert.id}/resident`, {
-      method: 'PATCH',
-      body: { action },
-    });
-    setAlert(data.alert);
-    if (action === 'SAFE') setMessage("You're marked safe. Location sharing has stopped.");
-    if (action === 'NEEDS_HELP') setMessage('Admin has been notified that you still need help. Location sharing is active.');
-    if (action === 'KEEP_ACTIVE') setMessage('SOS remains active. Admin will continue to see your alert.');
+    try {
+      const data = await api<{ alert: SosAlert }>(`/sos/${alert.id}/resident`, {
+        method: 'PATCH',
+        body: { action },
+      });
+      setAlert(data.alert);
+      if (action === 'SAFE') setMessage("You're marked safe. Location sharing has stopped.");
+      if (action === 'NEEDS_HELP') setMessage('Admin has been notified that you still need help. Location sharing is active.');
+      if (action === 'KEEP_ACTIVE') setMessage('SOS remains active. Admin will continue to see your alert.');
+    } catch {
+      setMessage('Unable to update your SOS status. Please try again or call 911 if this is an emergency.');
+    }
   };
 
   if (alert?.status === 'SAFE' || alert?.status === 'RESOLVED') {
@@ -238,7 +262,7 @@ export function ResidentSosPanel() {
               <p className="text-sm text-emerald-800">Location sharing is off.</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => setAlert(null)}>Reset panel</Button>
+          <Button variant="outline" onClick={() => setAlert(null)}>Dismiss closed alert</Button>
         </CardBody>
       </Card>
     );
@@ -299,10 +323,6 @@ export function ResidentSosPanel() {
           onPointerUp={cancelHold}
           onPointerCancel={cancelHold}
           onPointerLeave={cancelHold}
-          onTouchStart={startHold}
-          onTouchEnd={cancelHold}
-          onMouseDown={startHold}
-          onMouseUp={cancelHold}
           onContextMenu={(event) => event.preventDefault()}
           disabled={isSending}
           style={{
@@ -327,8 +347,17 @@ export function ResidentSosPanel() {
       </div>
 
       <div className="text-center">
-        <p className="text-sm font-semibold text-slate-800">Keep holding to send SOS.</p>
+        <p className="text-sm font-semibold text-slate-800">
+          {sosState === 'holding'
+            ? 'Keep holding to send SOS.'
+            : sosState === 'cancelled'
+              ? 'SOS cancelled.'
+              : sosState === 'failed'
+                ? 'SOS failed. Try again or call 911 immediately.'
+                : 'Keep holding to send SOS.'}
+        </p>
         {message && <p className="mt-2 max-w-md text-sm font-medium text-slate-600">{message}</p>}
+        {process.env.NODE_ENV !== 'production' && lastSosId && <p className="mt-1 text-xs font-medium text-slate-500">Last SOS ID: {lastSosId}</p>}
       </div>
     </div>
   );

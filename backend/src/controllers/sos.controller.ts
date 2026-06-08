@@ -8,7 +8,6 @@ import {
   markEmergencyAlertAcknowledged,
   markEmergencyAlertResolved,
   scheduleSosFallbacks,
-  sendSosPushNotifications,
 } from '../services/emergencyNotification.service';
 
 const ACTIVE_STATUSES = [
@@ -28,7 +27,7 @@ function parseLocation(body: Record<string, unknown>) {
   const heading = body.heading === undefined || body.heading === null ? undefined : Number(body.heading);
 
   if ((latitude !== null && !Number.isFinite(latitude)) || (longitude !== null && !Number.isFinite(longitude))) {
-    return { latitude: null, longitude: null, accuracy: undefined, speed: undefined, heading: undefined, streetAddress: 'Location unavailable', landmark: undefined };
+    return { latitude: null, longitude: null, accuracy: undefined, speed: undefined, heading: undefined, streetAddress: 'Location unavailable', landmark: undefined, city: undefined, state: undefined };
   }
 
   return {
@@ -39,7 +38,63 @@ function parseLocation(body: Record<string, unknown>) {
     heading: Number.isFinite(heading) ? heading : undefined,
     streetAddress: typeof body.streetAddress === 'string' ? body.streetAddress : undefined,
     landmark: typeof body.landmark === 'string' ? body.landmark : undefined,
+    city: typeof body.city === 'string' ? body.city : undefined,
+    state: typeof body.state === 'string' ? body.state : undefined,
   };
+}
+
+type ParsedLocation = ReturnType<typeof parseLocation>;
+
+async function reverseGeocode(location: ParsedLocation): Promise<ParsedLocation> {
+  if (!hasCoordinates(location) || (location.streetAddress && location.city && location.state)) return location;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse');
+    url.searchParams.set('format', 'jsonv2');
+    url.searchParams.set('lat', String(location.latitude));
+    url.searchParams.set('lon', String(location.longitude));
+    url.searchParams.set('zoom', '18');
+    url.searchParams.set('addressdetails', '1');
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'HollerHub SOS geocoder (admin@hideawayholler.com)' },
+    });
+    if (!response.ok) return location;
+    const data = (await response.json()) as {
+      display_name?: string;
+      name?: string;
+      address?: {
+        house_number?: string;
+        road?: string;
+        neighbourhood?: string;
+        suburb?: string;
+        city?: string;
+        town?: string;
+        village?: string;
+        county?: string;
+        state?: string;
+      };
+    };
+    const address = data.address || {};
+    const street = [address.house_number, address.road].filter(Boolean).join(' ');
+    return {
+      ...location,
+      streetAddress: location.streetAddress || street || data.display_name || 'Location available',
+      landmark: location.landmark || data.name || address.neighbourhood || address.suburb || address.county,
+      city: location.city || address.city || address.town || address.village,
+      state: location.state || address.state,
+    };
+  } catch (err) {
+    console.warn('[sos geocode] Reverse geocoding failed', {
+      message: err instanceof Error ? err.message : 'Unknown geocoding error',
+    });
+    return location;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function hasCoordinates(location: { latitude: number | null; longitude: number | null }) {
@@ -59,6 +114,53 @@ function sortActiveAlerts<T extends { status: SosAlertStatus; trackingActive: bo
     if (urgency !== 0) return urgency;
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
+}
+
+async function enrichAlertLocationIfNeeded<T extends {
+  id: string;
+  currentLatitude: number | null;
+  currentLongitude: number | null;
+  initialLatitude: number | null;
+  initialLongitude: number | null;
+  accuracy: number | null;
+  streetAddress: string | null;
+  landmark: string | null;
+  city?: string | null;
+  state?: string | null;
+}>(alert: T): Promise<T> {
+  const latitude = alert.currentLatitude ?? alert.initialLatitude;
+  const longitude = alert.currentLongitude ?? alert.initialLongitude;
+  if (latitude == null || longitude == null || (alert.streetAddress && alert.city && alert.state)) return alert;
+
+  const enriched = await reverseGeocode({
+    latitude,
+    longitude,
+    accuracy: alert.accuracy ?? undefined,
+    speed: undefined,
+    heading: undefined,
+    streetAddress: alert.streetAddress ?? undefined,
+    landmark: alert.landmark ?? undefined,
+    city: alert.city ?? undefined,
+    state: alert.state ?? undefined,
+  });
+
+  if (!enriched.streetAddress && !enriched.landmark && !enriched.city && !enriched.state) return alert;
+
+  const updated = await prisma.sosAlert.update({
+    where: { id: alert.id },
+    data: {
+      streetAddress: enriched.streetAddress || alert.streetAddress,
+      landmark: enriched.landmark || alert.landmark,
+      city: enriched.city || alert.city,
+      state: enriched.state || alert.state,
+    },
+    include: {
+      resident: { include: { profile: true } },
+      locationHistory: { orderBy: { createdAt: 'desc' }, take: 10 },
+    },
+  });
+
+  return { ...alert, ...updated };
 }
 
 function logSosEvent(data: {
@@ -131,7 +233,12 @@ async function updateSosAcknowledgement(sosAlertId: string, adminId: string, use
   });
 
   console.info('[sos admin] Alert acknowledged', { sosAlertId: updated.id, adminId });
-  await markEmergencyAlertAcknowledged(updated.id);
+  void markEmergencyAlertAcknowledged(updated.id).catch((err) => {
+    console.warn('[sos admin] Emergency alert acknowledge mirror failed', {
+      sosAlertId: updated.id,
+      message: err instanceof Error ? err.message : 'Unknown mirror update error',
+    });
+  });
   return updated;
 }
 
@@ -165,21 +272,10 @@ async function residentContext(userId: string) {
   if (!user) return null;
 
   const houseAssignment = user.residentHouseAssignments[0]?.houseAssignment.houseName;
-  const assignment = user.roomAssignments[0];
-  const roomAssignment = assignment
-    ? [
-        assignment.room.building.name,
-        `Room ${assignment.room.roomNumber}`,
-        assignment.bed ? `Bed ${assignment.bed.bedLabel}` : null,
-      ]
-        .filter(Boolean)
-        .join(' / ')
-    : undefined;
-
   return {
     residentName: user.profile?.fullName || user.email,
     phone: user.profile?.phone,
-    assignment: houseAssignment || roomAssignment,
+    assignment: houseAssignment || 'House assignment pending',
   };
 }
 
@@ -190,7 +286,7 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
     return res.status(403).json({ error: 'Only resident portal users can create resident SOS alerts' });
   }
 
-  const location = parseLocation(req.body);
+  const location = await reverseGeocode(parseLocation(req.body));
 
   const existing = await prisma.sosAlert.findFirst({
     where: { residentId: req.user!.userId, status: { in: ACTIVE_STATUSES } },
@@ -212,6 +308,8 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
             heading: location.heading,
             streetAddress: location.streetAddress,
             landmark: location.landmark,
+            city: location.city,
+            state: location.state,
           },
         });
       }
@@ -235,6 +333,10 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
           accuracy: location.accuracy,
           streetAddress: location.streetAddress || existing.streetAddress,
           landmark: location.landmark || existing.landmark,
+          city: location.city || existing.city,
+          state: location.state || existing.state,
+          trackingActive: hasCoordinates(location) ? true : existing.trackingActive,
+          trackingStartedAt: hasCoordinates(location) ? existing.trackingStartedAt || new Date() : existing.trackingStartedAt,
         },
         include: { locationHistory: { orderBy: { createdAt: 'desc' }, take: 10 } },
       });
@@ -273,6 +375,10 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
         accuracy: location.accuracy,
         streetAddress: location.streetAddress,
         landmark: location.landmark,
+        city: location.city,
+        state: location.state,
+        trackingActive: hasCoordinates(location),
+        trackingStartedAt: hasCoordinates(location) ? new Date() : undefined,
         ...(hasCoordinates(location)
           ? {
               locationHistory: {
@@ -285,6 +391,8 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
                   heading: location.heading,
                   streetAddress: location.streetAddress,
                   landmark: location.landmark,
+                  city: location.city,
+                  state: location.state,
                 },
               },
             }
@@ -318,14 +426,7 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
   });
 
   console.info('[sos resident] SOS record created successfully', { sosAlertId: alert.id, residentId: req.user!.userId, businessId: business.id });
-  // SOS creation is already committed above. Notification failures are logged and must never undo the alert.
-  console.info('[sos resident] Push delivery queued', { sosAlertId: alert.id });
-  void sendSosPushNotifications(alert).catch((err) => {
-    console.warn('[sos resident] SOS push notification dispatch failed', {
-      sosAlertId: alert.id,
-      message: err instanceof Error ? err.message : 'Unknown error',
-    });
-  });
+  // Mobile push is disabled for the stable production path; admin dashboards receive SOS through polling.
   void scheduleSosFallbacks(alert.id).catch((err) => {
     console.warn('[sos resident] SOS fallback scheduling failed', {
       sosAlertId: alert.id,
@@ -341,13 +442,13 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
 
 export async function createTestSosAlert(req: AuthRequest, res: Response) {
   const business = await getDefaultBusinessAccount();
-  const location = parseLocation({
+  const location = await reverseGeocode(parseLocation({
     latitude: req.body?.latitude ?? 35.5175,
     longitude: req.body?.longitude ?? -86.5804,
     accuracy: req.body?.accuracy ?? 25,
     streetAddress: req.body?.streetAddress ?? 'Test SOS location',
     landmark: req.body?.landmark ?? 'Super Admin test alert',
-  });
+  }));
 
   if (!location) {
     return res.status(400).json({ error: 'Valid latitude and longitude are required' });
@@ -374,6 +475,10 @@ export async function createTestSosAlert(req: AuthRequest, res: Response) {
         accuracy: location.accuracy,
         streetAddress: location.streetAddress,
         landmark: location.landmark,
+        city: location.city,
+        state: location.state,
+        trackingActive: true,
+        trackingStartedAt: new Date(),
       },
     });
 
@@ -390,13 +495,6 @@ export async function createTestSosAlert(req: AuthRequest, res: Response) {
     });
 
     return created;
-  });
-
-  void sendSosPushNotifications(alert).catch((err) => {
-    console.warn('[sos test] SOS push notification dispatch failed', {
-      sosAlertId: alert.id,
-      message: err instanceof Error ? err.message : 'Unknown error',
-    });
   });
 
   res.status(201).json({ alert });
@@ -495,11 +593,11 @@ export async function residentSosAction(req: AuthRequest, res: Response) {
   if (action === 'SAFE') {
     await markEmergencyAlertResolved(updated.id);
   }
-  res.json({ alert: updated });
+  res.json({ success: true, sosAlert: updated, alert: updated });
 }
 
 export async function addSosLocation(req: AuthRequest, res: Response) {
-  const location = parseLocation(req.body);
+  const location = await reverseGeocode(parseLocation(req.body));
   if (!hasCoordinates(location)) {
     return res.status(400).json({ error: 'Valid latitude and longitude are required' });
   }
@@ -527,6 +625,8 @@ export async function addSosLocation(req: AuthRequest, res: Response) {
         heading: location.heading,
         streetAddress: location.streetAddress,
         landmark: location.landmark,
+        city: location.city,
+        state: location.state,
       },
     }),
     prisma.sosAlert.update({
@@ -537,6 +637,8 @@ export async function addSosLocation(req: AuthRequest, res: Response) {
         accuracy: location.accuracy,
         streetAddress: location.streetAddress || alert.streetAddress,
         landmark: location.landmark || alert.landmark,
+        city: location.city || alert.city,
+        state: location.state || alert.state,
         trackingActive: true,
         trackingStartedAt: alert.trackingStartedAt || now,
       },
@@ -589,7 +691,7 @@ export async function listActiveAdminSosAlerts(req: AuthRequest, res: Response) 
 
   const alerts = await prisma.sosAlert.findMany({
     where: {
-      ...(req.user!.role === UserRole.SUPER_ADMIN ? {} : { OR: [{ businessId: business.id }, { businessId: null }] }),
+      OR: [{ businessId: business.id }, { businessId: null }],
       status: { not: SosAlertStatus.RESOLVED },
       resolvedAt: null,
     },
@@ -601,7 +703,8 @@ export async function listActiveAdminSosAlerts(req: AuthRequest, res: Response) 
     take: 100,
   });
 
-  const sorted = sortActiveAlerts(alerts);
+  const enrichedAlerts = await Promise.all(alerts.map((alert) => enrichAlertLocationIfNeeded(alert)));
+  const sorted = sortActiveAlerts(enrichedAlerts);
   console.info('[sos admin] Active SOS query complete', {
     adminId: req.user!.userId,
     role: req.user!.role,
@@ -651,6 +754,21 @@ export async function listSosHistory(req: AuthRequest, res: Response) {
   res.json({ alerts });
 }
 
+export async function listSuperAdminSosLogs(req: AuthRequest, res: Response) {
+  const alerts = await prisma.sosAlert.findMany({
+    include: {
+      resident: { include: { profile: true } },
+      locationHistory: { orderBy: { createdAt: 'desc' }, take: 5 },
+      eventLogs: { orderBy: { createdAt: 'asc' } },
+      business: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 300,
+  });
+
+  res.json({ alerts });
+}
+
 export async function getSosAlert(req: AuthRequest, res: Response) {
   const alert = await prisma.sosAlert.findUnique({
     where: { id: req.params.id },
@@ -677,7 +795,7 @@ export async function acknowledgeSosAlert(req: AuthRequest, res: Response) {
     return res.status(404).json({ error: 'SOS alert not found' });
   }
 
-  res.json({ alert: updated });
+  res.json({ success: true, sosAlert: updated, alert: updated });
 }
 
 export async function resolveSosAlert(req: AuthRequest, res: Response) {
@@ -732,7 +850,7 @@ export async function adminSosAction(req: AuthRequest, res: Response) {
   if (action === 'ACKNOWLEDGE') {
     const updated = await updateSosAcknowledgement(alert.id, req.user!.userId, req.user);
     if (updated === 'FORBIDDEN') return res.status(403).json({ error: 'Insufficient permissions for this SOS alert' });
-    return res.json({ alert: updated });
+    return res.json({ success: true, sosAlert: updated, alert: updated });
   }
 
   if (!data) {
@@ -776,6 +894,11 @@ export async function adminSosAction(req: AuthRequest, res: Response) {
     return resolved;
   });
 
-  await markEmergencyAlertResolved(updated.id);
-  res.json({ alert: updated });
+  void markEmergencyAlertResolved(updated.id).catch((err) => {
+    console.warn('[sos admin] Emergency alert resolve mirror failed', {
+      sosAlertId: updated.id,
+      message: err instanceof Error ? err.message : 'Unknown mirror update error',
+    });
+  });
+  res.json({ success: true, sosAlert: updated, alert: updated });
 }

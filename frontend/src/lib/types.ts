@@ -182,6 +182,8 @@ export interface SosLocationHistory {
   accuracy?: number;
   streetAddress?: string;
   landmark?: string;
+  city?: string;
+  state?: string;
   residentId?: string;
   speed?: number;
   heading?: number;
@@ -230,6 +232,8 @@ export interface SosAlert {
   accuracy?: number;
   streetAddress?: string;
   landmark?: string;
+  city?: string;
+  state?: string;
   adminAcknowledged: boolean;
   adminAcknowledgedAt?: string;
   adminAcknowledgedBy?: string;

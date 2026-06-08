@@ -31,9 +31,12 @@ export default function ResidentDashboard() {
       signedFilePath?: string;
     };
   } | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    api<typeof data>('/dashboard/resident').then(setData).catch(console.error);
+    api<typeof data>('/dashboard/resident')
+      .then(setData)
+      .catch(() => setLoadError('Unable to load dashboard details. Please refresh or sign in again.'));
   }, []);
 
   return (
@@ -56,7 +59,7 @@ export default function ResidentDashboard() {
               { href: '/weather', label: 'View Weather' },
               { href: '/maintenance', label: 'Submit Maintenance' },
               { href: '/internet', label: 'View Wi-Fi' },
-              { href: '/emergency-alerts', label: 'Emergency Info' },
+              { href: '/dashboard/emergency-sos', label: 'Emergency SOS' },
               { href: '/transportation', label: 'Transportation' },
             ].map((action) => (
               <Link key={action.href} href={action.href} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700 shadow-sm hover:border-brand-300">
@@ -64,6 +67,7 @@ export default function ResidentDashboard() {
               </Link>
             ))}
           </div>
+          {loadError && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{loadError}</p>}
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Link href="/notices" className="block">
@@ -148,7 +152,7 @@ export default function ResidentDashboard() {
                 <CardBody className="flex items-center gap-3">
                   <ShieldAlert className="h-5 w-5 text-red-600" />
                   <div>
-                    <p className="text-sm text-slate-500">Emergency Alerts</p>
+                    <p className="text-sm text-slate-500">County Alerts</p>
                     <p className="text-xl font-semibold">CodeRED</p>
                   </div>
                 </CardBody>

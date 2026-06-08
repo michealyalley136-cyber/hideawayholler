@@ -23,6 +23,8 @@ import settingsRoutes from './settings.routes';
 import houseAssignmentRoutes from './houseAssignment.routes';
 import sosSettingsRoutes from './sosSettings.routes';
 import businessBillingRoutes from './businessBilling.routes';
+import * as sos from '../controllers/sos.controller';
+import { authenticate, authorizeSuperAdmin } from '../middleware/auth';
 
 const router = Router();
 
@@ -54,5 +56,6 @@ router.use('/settings', settingsRoutes);
 router.use('/sos-settings', sosSettingsRoutes);
 router.use('/house-assignments', houseAssignmentRoutes);
 router.use('/business-billing', businessBillingRoutes);
+router.get('/super-admin/sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 
 export default router;

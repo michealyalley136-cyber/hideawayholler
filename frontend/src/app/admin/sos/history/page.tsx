@@ -30,17 +30,24 @@ function mapUrl(alert: SosAlert) {
   const latitude = alert.currentLatitude ?? alert.initialLatitude;
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
   if (latitude == null || longitude == null) return null;
-  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  return `https://www.google.com/maps?q=${latitude},${longitude}`;
+}
+
+function houseAssignmentLabel(alert: SosAlert) {
+  const assignment = alert.assignment || '';
+  if (!assignment || /room|bed|building/i.test(assignment)) return 'House assignment pending';
+  return assignment;
 }
 
 export default function SosHistoryPage() {
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     api<{ alerts: SosAlert[] }>('/admin/sos/history')
       .then((data) => setAlerts(data.alerts))
-      .catch((err) => console.error('[sos-history] Failed to load SOS history', err))
+      .catch(() => setLoadError('Unable to load SOS history. Please refresh or contact support.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -58,7 +65,13 @@ export default function SosHistoryPage() {
             </Link>
           </div>
 
-          {loading ? (
+          {loadError ? (
+            <Card>
+              <CardBody>
+                <p className="text-sm font-semibold text-red-700">{loadError}</p>
+              </CardBody>
+            </Card>
+          ) : loading ? (
             <Card>
               <CardBody>
                 <p className="text-sm text-slate-500">Loading SOS history...</p>
@@ -83,7 +96,7 @@ export default function SosHistoryPage() {
                           <h2 className="font-bold text-slate-950">{alert.residentName}</h2>
                           <Badge className="bg-slate-100 text-slate-700">{alert.status.replace('_', ' ')}</Badge>
                         </div>
-                        <p className="mt-1 text-sm text-slate-600">{alert.assignment || 'No assignment recorded'}</p>
+                        <p className="mt-1 text-sm text-slate-600">House Assignment: {houseAssignmentLabel(alert)}</p>
                       </div>
                       <p className="text-sm font-medium text-slate-700">{formatDate(alert.createdAt)}</p>
                     </div>
@@ -109,9 +122,6 @@ export default function SosHistoryPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Link href={`/admin/sos?alert=${alert.id}`} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-                        View Details
-                      </Link>
                       <a
                         href={alertMapUrl || undefined}
                         aria-disabled={!alertMapUrl}

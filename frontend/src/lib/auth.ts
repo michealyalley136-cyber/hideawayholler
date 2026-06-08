@@ -6,25 +6,50 @@ const AUTH_LAST_ACTIVITY_KEY = 'auth:lastActivity';
 
 type StorageType = 'local' | 'session';
 
-function getStorage(type: StorageType) {
+function getStorage(type: StorageType): Storage | null {
+  if (typeof window === 'undefined') return null;
   return type === 'local' ? localStorage : sessionStorage;
+}
+
+function getStorageItem(type: StorageType, key: string): string | null {
+  try {
+    return getStorage(type)?.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function setStorageItem(type: StorageType, key: string, value: string) {
+  try {
+    getStorage(type)?.setItem(key, value);
+  } catch {
+    // Some mobile/private browser modes expose storage but throw on use.
+  }
+}
+
+function removeStorageItem(type: StorageType, key: string) {
+  try {
+    getStorage(type)?.removeItem(key);
+  } catch {
+    // Ignore storage cleanup failures; auth guards will recover on next load.
+  }
 }
 
 export function getActiveAuthStorage(): StorageType | null {
   if (typeof window === 'undefined') return null;
-  if (localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_USER_KEY)) return 'local';
-  if (sessionStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_USER_KEY)) return 'session';
+  if (getStorageItem('local', AUTH_TOKEN_KEY) || getStorageItem('local', AUTH_USER_KEY)) return 'local';
+  if (getStorageItem('session', AUTH_TOKEN_KEY) || getStorageItem('session', AUTH_USER_KEY)) return 'session';
   return null;
 }
 
 export function getStoredToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY);
+  return getStorageItem('local', AUTH_TOKEN_KEY) || getStorageItem('session', AUTH_TOKEN_KEY);
 }
 
 export function getStoredUser(): User | null {
   if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem(AUTH_USER_KEY) || sessionStorage.getItem(AUTH_USER_KEY);
+  const raw = getStorageItem('local', AUTH_USER_KEY) || getStorageItem('session', AUTH_USER_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -35,33 +60,33 @@ export function getStoredUser(): User | null {
 
 export function setAuth(token: string, user: User, rememberMe = true) {
   if (typeof window === 'undefined') return;
-  const storage = getStorage(rememberMe ? 'local' : 'session');
-  storage.setItem(AUTH_TOKEN_KEY, token);
-  storage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-  if (!rememberMe) storage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
+  const activeStorage = rememberMe ? 'local' : 'session';
+  setStorageItem(activeStorage, AUTH_TOKEN_KEY, token);
+  setStorageItem(activeStorage, AUTH_USER_KEY, JSON.stringify(user));
+  if (!rememberMe) setStorageItem(activeStorage, AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
 
-  const otherStorage = getStorage(rememberMe ? 'session' : 'local');
-  otherStorage.removeItem(AUTH_TOKEN_KEY);
-  otherStorage.removeItem(AUTH_USER_KEY);
-  otherStorage.removeItem(AUTH_LAST_ACTIVITY_KEY);
+  const otherStorage = rememberMe ? 'session' : 'local';
+  removeStorageItem(otherStorage, AUTH_TOKEN_KEY);
+  removeStorageItem(otherStorage, AUTH_USER_KEY);
+  removeStorageItem(otherStorage, AUTH_LAST_ACTIVITY_KEY);
 }
 
 export function setStoredUser(user: User) {
   if (typeof window === 'undefined') return;
   const activeType = getActiveAuthStorage() ?? 'local';
-  getStorage(activeType).setItem(AUTH_USER_KEY, JSON.stringify(user));
+  setStorageItem(activeType, AUTH_USER_KEY, JSON.stringify(user));
 }
 
 export function touchSessionActivity() {
   if (typeof window === 'undefined') return;
   if (getActiveAuthStorage() === 'session') {
-    sessionStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
+    setStorageItem('session', AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
   }
 }
 
 export function getSessionLastActivity(): number | null {
   if (typeof window === 'undefined') return null;
-  const raw = sessionStorage.getItem(AUTH_LAST_ACTIVITY_KEY);
+  const raw = getStorageItem('session', AUTH_LAST_ACTIVITY_KEY);
   if (!raw) return null;
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
@@ -69,11 +94,11 @@ export function getSessionLastActivity(): number | null {
 
 export function clearAuth() {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem(AUTH_USER_KEY);
-  sessionStorage.removeItem(AUTH_TOKEN_KEY);
-  sessionStorage.removeItem(AUTH_USER_KEY);
-  sessionStorage.removeItem(AUTH_LAST_ACTIVITY_KEY);
+  removeStorageItem('local', AUTH_TOKEN_KEY);
+  removeStorageItem('local', AUTH_USER_KEY);
+  removeStorageItem('session', AUTH_TOKEN_KEY);
+  removeStorageItem('session', AUTH_USER_KEY);
+  removeStorageItem('session', AUTH_LAST_ACTIVITY_KEY);
 }
 
 export function getDashboardPath(role: UserRole | string): string {

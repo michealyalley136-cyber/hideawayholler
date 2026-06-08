@@ -1,118 +1,112 @@
-const CACHE_VERSION = 'hollerhub-static-v2';
+const CACHE_NAME = 'hollerhub-static-v4';
 const STATIC_ASSETS = [
-  '/offline',
   '/manifest.webmanifest',
-  '/admin-sos.webmanifest',
-  '/favicon.ico',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png'
+  '/sounds/sos-siren.mp3',
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .catch(() => undefined),
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  const request = event.request;
-  const url = new URL(request.url);
+  const { request } = event;
 
-  if (request.method !== 'GET') return;
-  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/uploads')) return;
-
-  // Never cache Next.js build chunks — they are content-hashed and stale SW caches
-  // caused SOS action buttons to keep calling old API routes after deploys.
-  if (url.pathname.startsWith('/_next/')) return;
-
-  const isStaticAsset =
-    url.pathname.startsWith('/icons/') ||
-    url.pathname.startsWith('/images/') ||
-    url.pathname === '/favicon.ico' ||
-    url.pathname === '/manifest.webmanifest' ||
-    request.destination === 'image' ||
-    request.destination === 'font';
-
-  if (isStaticAsset) {
-    event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
-        return response;
-      }))
-    );
+  if (request.method !== 'GET') {
     return;
   }
 
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => response)
-        .catch(() => caches.match('/offline'))
-    );
+  const requestUrl = new URL(request.url);
+
+  if (requestUrl.pathname.startsWith('/api/') || requestUrl.pathname.includes('/documents/')) {
+    return;
   }
+
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) {
+        return cached;
+      }
+
+      return fetch(request).then((response) => {
+        const isSafeStaticAsset =
+          requestUrl.origin === self.location.origin &&
+          response.ok &&
+          (requestUrl.pathname.startsWith('/icons/') ||
+            requestUrl.pathname.startsWith('/sounds/') ||
+            requestUrl.pathname === '/manifest.webmanifest');
+
+        if (isSafeStaticAsset) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+        }
+
+        return response;
+      });
+    }),
+  );
 });
 
 self.addEventListener('push', (event) => {
   let data = {};
+
   try {
     data = event.data ? event.data.json() : {};
   } catch {
     data = {};
   }
 
-  const title = data.isTest ? 'TEST Emergency SOS Alert' : (data.title || 'Emergency SOS Alert');
-  const bodyPrefix = data.isTest ? '[TEST] ' : '';
-  const body = bodyPrefix + (data.body || 'A resident emergency alert has been triggered. Open the SOS console.');
   const alertId = data.alertId || data.id;
-  const url = data.url || (alertId ? `/admin/sos?alertId=${encodeURIComponent(alertId)}` : '/admin/sos');
-  const notificationData = {
-    url,
-    alertId,
-    residentName: data.residentName,
-    emergencyType: data.emergencyType || 'SOS',
-    location: data.location || data.address,
-    businessId: data.businessId,
-    createdAt: data.createdAt,
-    isTest: Boolean(data.isTest)
-  };
+  const url = data.url || (alertId ? `/admin/sos?alert=${encodeURIComponent(alertId)}` : '/admin/sos');
 
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
+    self.registration.showNotification(data.title || 'Emergency SOS Alert', {
+      body: data.body || 'A resident emergency alert has been triggered. Open the SOS center.',
+      tag: alertId ? `sos-${alertId}` : 'sos-alert',
+      data: { url },
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      tag: alertId ? `sos-${alertId}` : 'sos-alert',
       silent: false,
-      renotify: true,
       requireInteraction: true,
-      vibrate: [900, 250, 900, 250, 900],
-      data: notificationData,
-    })
+      renotify: true,
+      vibrate: [300, 150, 300, 150, 500],
+    }),
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/admin/sos';
+  const targetUrl = event.notification.data?.url || '/admin/sos';
+  const absoluteUrl = new URL(targetUrl, self.location.origin).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if ('focus' in client && (client.url.includes('/admin/sos') || client.url.includes('/admin/dashboard'))) {
+        if ('focus' in client && client.url.startsWith(self.location.origin) && client.url.includes('/admin')) {
+          if ('navigate' in client) {
+            return client.navigate(absoluteUrl).then((navigatedClient) => navigatedClient?.focus());
+          }
           return client.focus();
         }
       }
-      return self.clients.openWindow(url);
-    })
+
+      return self.clients.openWindow(absoluteUrl);
+    }),
   );
 });

@@ -1,4 +1,10 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "npm ci"
+  "installCommand": "npm ci",
+  "rewrites": [
+    {
+      "source": "/api/backend/dashboard/admin",
+      "destination": "/api/backend/admin/dashboard"
+    }
+  ]
 }

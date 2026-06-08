@@ -3,6 +3,8 @@ import { BusinessInvoiceStatus, BusinessPaymentMethod, BusinessPaymentStatus, Cl
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { logAuditEvent } from '../services/audit.service';
+import { getServiceBillingSummary } from '../services/clientServiceBilling.service';
+import { billingSettingsPayload, ensureClientBillingSettings } from '../services/billingSettings.service';
 import {
   APPCREATIVES_PAYEE_NAME,
   ensureStripeCustomer,
@@ -28,31 +30,66 @@ function requireBillingSuperAdmin(req: AuthRequest, res: Response) {
   return true;
 }
 
-async function billingAccountWithHistory() {
+async function loadSharedClientBilling() {
   const account = await getDefaultBusinessAccount();
-  return prisma.businessAccount.findUnique({
-    where: { id: account.id },
-    include: {
-      subscriptions: { orderBy: { updatedAt: 'desc' } },
-      invoices: { orderBy: { createdAt: 'desc' }, take: 24 },
-      payments: { orderBy: { createdAt: 'desc' }, take: 24 },
-    },
-  });
+  const [{ settings }, serviceBilling] = await Promise.all([
+    ensureClientBillingSettings(account.id),
+    getServiceBillingSummary(account.id),
+  ]);
+  return { account, settings, serviceBilling };
 }
 
-export async function getBusinessBillingOverview(req: AuthRequest, res: Response) {
-  const account = await billingAccountWithHistory();
-  const activeSubscription = account?.subscriptions[0] || null;
+export async function getBusinessBillingOverview(_req: AuthRequest, res: Response) {
+  const { account, settings, serviceBilling } = await loadSharedClientBilling();
 
+  res.setHeader('Cache-Control', 'no-store');
   res.json({
     payee: APPCREATIVES_PAYEE_NAME,
-    account,
-    activeSubscription,
-    invoices: account?.invoices || [],
-    payments: account?.payments || [],
+    account: {
+      id: account.id,
+      slug: account.slug,
+      businessName: account.businessName,
+      billingEmail: account.billingEmail,
+      setupFeeAmount: account.setupFeeAmount,
+      setupFeeStatus: account.setupFeeStatus,
+      setupFeePaidAt: account.setupFeePaidAt,
+      isSuspended: account.isSuspended,
+      createdAt: account.createdAt,
+      updatedAt: account.updatedAt,
+    },
+    billingSettings: settings ? billingSettingsPayload(settings) : null,
+    serviceBilling,
+    subscription: serviceBilling.subscription,
+    activeSubscription: {
+      status: serviceBilling.subscription.serviceSubscriptionStatus,
+      planName: serviceBilling.currentPlan,
+      currentPeriodEnd: serviceBilling.subscription.nextPaymentDate,
+      currentMonthlyFee: serviceBilling.currentMonthlyFee,
+      currentAmountDue: serviceBilling.currentAmountDue,
+      taxRate: Number(serviceBilling.subscription.taxRate),
+    },
+    invoices: serviceBilling.invoices,
+    payments: serviceBilling.payments,
+    summary: {
+      currentPlan: serviceBilling.currentPlan,
+      currentMonthlyFee: serviceBilling.currentMonthlyFee,
+      currentAmountDue: serviceBilling.currentAmountDue,
+      currentTaxAmount: serviceBilling.currentTaxAmount,
+      outstandingBalance: serviceBilling.outstandingBalance,
+      totalPaymentsReceived: serviceBilling.totalPaymentsReceived,
+      totalInvoicesGenerated: serviceBilling.totalInvoicesGenerated,
+      paidInvoices: serviceBilling.paidInvoices,
+      unpaidInvoices: serviceBilling.unpaidInvoices,
+      pastDueInvoices: serviceBilling.pastDueInvoices,
+      nextPaymentDate: serviceBilling.subscription.nextPaymentDate,
+      subscriptionStatus: serviceBilling.subscription.serviceSubscriptionStatus,
+    },
     permissions: {
       isBillingSuperAdmin: false,
+      canEditPricing: false,
+      canSuspendAccount: false,
     },
+    lastUpdatedAt: new Date().toISOString(),
     stripe: {
       configured: stripeIsConfigured(),
       checkoutReady: stripeCheckoutIsConfigured(),
@@ -62,21 +99,15 @@ export async function getBusinessBillingOverview(req: AuthRequest, res: Response
 }
 
 export async function listBusinessInvoices(_req: AuthRequest, res: Response) {
-  const account = await getDefaultBusinessAccount();
-  const invoices = await prisma.businessInvoice.findMany({
-    where: { businessAccountId: account.id },
-    orderBy: { createdAt: 'desc' },
-  });
-  res.json({ invoices });
+  const { serviceBilling } = await loadSharedClientBilling();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ invoices: serviceBilling.invoices });
 }
 
 export async function listBusinessPayments(_req: AuthRequest, res: Response) {
-  const account = await getDefaultBusinessAccount();
-  const payments = await prisma.businessPayment.findMany({
-    where: { businessAccountId: account.id },
-    orderBy: { createdAt: 'desc' },
-  });
-  res.json({ payments });
+  const { serviceBilling } = await loadSharedClientBilling();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ payments: serviceBilling.payments });
 }
 
 export async function createBusinessCheckoutSession(req: AuthRequest, res: Response) {
@@ -150,10 +181,24 @@ export async function createBusinessBillingPortalSession(req: AuthRequest, res: 
 export async function getSuperAdminBillingControls(req: AuthRequest, res: Response) {
   if (!requireBillingSuperAdmin(req, res)) return;
 
-  const account = await billingAccountWithHistory();
+  const { account, settings, serviceBilling } = await loadSharedClientBilling();
+  res.setHeader('Cache-Control', 'no-store');
   res.json({
     payee: APPCREATIVES_PAYEE_NAME,
-    account,
+    account: {
+      id: account.id,
+      slug: account.slug,
+      businessName: account.businessName,
+      billingEmail: account.billingEmail,
+      setupFeeAmount: account.setupFeeAmount,
+      setupFeeStatus: account.setupFeeStatus,
+      setupFeePaidAt: account.setupFeePaidAt,
+      isSuspended: account.isSuspended,
+      createdAt: account.createdAt,
+      updatedAt: account.updatedAt,
+    },
+    billingSettings: settings ? billingSettingsPayload(settings) : null,
+    serviceBilling,
     stripe: {
       configured: stripeIsConfigured(),
       checkoutReady: stripeCheckoutIsConfigured(),

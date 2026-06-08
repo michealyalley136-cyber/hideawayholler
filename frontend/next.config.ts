@@ -3,6 +3,14 @@ import path from 'path';
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
+  async rewrites() {
+    return [
+      {
+        source: '/api/backend/dashboard/admin',
+        destination: '/api/backend/admin/dashboard',
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       { protocol: 'http', hostname: 'localhost', port: '4000', pathname: '/uploads/**' },

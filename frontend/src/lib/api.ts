@@ -92,6 +92,7 @@ export async function api<T>(
     url = apiPath(path);
     res = await fetch(url, {
       ...rest,
+      cache: 'no-store',
       headers: {
         ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),

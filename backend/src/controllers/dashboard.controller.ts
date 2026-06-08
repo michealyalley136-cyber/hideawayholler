@@ -52,6 +52,7 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
   const houseOccupancy = `${houseOccupancyCount}/${beds}`;
   const weatherAlerts = 0;
 
+  res.setHeader('Cache-Control', 'no-store');
   res.json({
     stats: {
       totalResidents,

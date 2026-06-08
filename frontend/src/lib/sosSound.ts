@@ -81,8 +81,8 @@ export async function playSosSound(options: { loop?: boolean } = {}) {
 
   try {
     audio.loop = options.loop ?? true;
-    startVibration();
     await audio.play();
+    startVibration();
     return true;
   } catch {
     stopVibration();

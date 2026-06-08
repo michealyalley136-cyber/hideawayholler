@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import * as sos from '../controllers/sos.controller';
 import { registerAdminDevice } from '../controllers/adminDevice.controller';
+import {
+  getBusinessBillingOverview,
+  listBusinessInvoices,
+  listBusinessPayments,
+} from '../controllers/businessBilling.controller';
+import * as dashboard from '../controllers/dashboard.controller';
 import { authenticate, authorizeAdmin, authorizeAdminOrSuperAdmin, authorizeSuperAdmin } from '../middleware/auth';
 
 const router = Router();
@@ -19,5 +25,13 @@ router.post('/sos/mute', authenticate, authorizeAdmin, sos.muteSosAlert);
 router.post('/sos/:sosAlertId/acknowledge', authenticate, authorizeAdmin, sos.acknowledgeSosAlert);
 router.post('/sos/:sosAlertId/resolve', authenticate, authorizeAdmin, sos.resolveSosAlert);
 router.post('/sos/:sosAlertId/mute', authenticate, authorizeAdmin, sos.muteSosAlert);
+
+// Vercel-safe alias: /api/admin/dashboard (api/admin/[...path].ts) mirrors /api/dashboard/admin
+router.get('/dashboard', authenticate, authorizeAdmin, dashboard.adminDashboard);
+
+// Shared client billing — same ClientService* records Super Admin manages
+router.get('/billing/subscription', authenticate, authorizeAdmin, getBusinessBillingOverview);
+router.get('/billing/invoices', authenticate, authorizeAdmin, listBusinessInvoices);
+router.get('/billing/payments', authenticate, authorizeAdmin, listBusinessPayments);
 
 export default router;

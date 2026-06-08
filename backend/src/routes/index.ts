@@ -24,13 +24,17 @@ import houseAssignmentRoutes from './houseAssignment.routes';
 import sosSettingsRoutes from './sosSettings.routes';
 import businessBillingRoutes from './businessBilling.routes';
 import * as sos from '../controllers/sos.controller';
-import { authenticate, authorizeSuperAdmin } from '../middleware/auth';
+import * as dashboard from '../controllers/dashboard.controller';
+import { authenticate, authorizeAdmin, authorizeSuperAdmin } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'hollerhub-api' });
 });
+
+// Single-segment Vercel-safe aliases for admin dashboard stats
+router.get('/admin-dashboard', authenticate, authorizeAdmin, dashboard.adminDashboard);
 
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);

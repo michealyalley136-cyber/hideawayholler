@@ -273,6 +273,7 @@ export async function getSuperAdminClientDashboard(req: AuthRequest, res: Respon
     const paidThisMonthAmount = paidThisMonth._sum.amount || 0;
     const paidThisYearAmount = paidThisYear._sum.amount || 0;
 
+    res.setHeader('Cache-Control', 'no-store');
     return res.json({
       client: {
         id: account.id,
@@ -387,6 +388,7 @@ export async function saveSuperAdminBillingSettings(req: AuthRequest, res: Respo
   if (!requireBillingSuperAdmin(req, res)) return;
 
   const account = await getDefaultBusinessAccount();
+  const { settings: existingSettings } = await ensureClientBillingSettings(account.id);
   const body = req.body || {};
 
   const setupFeeAmount = dollarsToCents(Number(body.setupFeeAmount));
@@ -440,15 +442,51 @@ export async function saveSuperAdminBillingSettings(req: AuthRequest, res: Respo
     action: 'BUSINESS_BILLING_SETTINGS_SAVED',
     entityType: 'ClientBillingSettings',
     entityId: result.settings.id,
+    metadata: {
+      oldValues: {
+        businessName: account.businessName,
+        billingEmail: account.billingEmail,
+        setupFeeAmount: existingSettings.setupFeeAmount,
+        setupFeeStatus: existingSettings.setupFeeStatus,
+        monthlySubscriptionAmount: existingSettings.monthlySubscriptionAmount,
+        billingFrequency: existingSettings.billingFrequency,
+        billingStartDate: existingSettings.billingStartDate,
+        nextBillingDate: existingSettings.nextBillingDate,
+        paymentDueDay: existingSettings.paymentDueDay,
+        gracePeriodDays: existingSettings.gracePeriodDays,
+        subscriptionStatus: existingSettings.subscriptionStatus,
+        notes: existingSettings.notes,
+      },
+      newValues: {
+        businessName: result.account.businessName,
+        billingEmail: result.account.billingEmail,
+        setupFeeAmount: result.settings.setupFeeAmount,
+        setupFeeStatus: result.settings.setupFeeStatus,
+        monthlySubscriptionAmount: result.settings.monthlySubscriptionAmount,
+        billingFrequency: result.settings.billingFrequency,
+        billingStartDate: result.settings.billingStartDate,
+        nextBillingDate: result.settings.nextBillingDate,
+        paymentDueDay: result.settings.paymentDueDay,
+        gracePeriodDays: result.settings.gracePeriodDays,
+        subscriptionStatus: result.settings.subscriptionStatus,
+        notes: result.settings.notes,
+      },
+    },
   });
 
-  res.json({ account: result.account, billingSettings: billingSettingsPayload(result.settings) });
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    account: result.account,
+    billingSettings: billingSettingsPayload(result.settings),
+    serviceBilling: await getServiceBillingSummary(account.id),
+  });
 }
 
 export async function updateSuperAdminServiceSubscriptionSettings(req: AuthRequest, res: Response) {
   if (!requireBillingSuperAdmin(req, res)) return;
 
   const account = await getDefaultBusinessAccount();
+  const existingSubscription = await prisma.clientServiceSubscription.findUnique({ where: { businessId: account.id } });
   const body = req.body || {};
   const taxRate = body.taxRate !== undefined ? Number(body.taxRate) : undefined;
   const billingDay = body.billingDay !== undefined ? Number(body.billingDay) : undefined;
@@ -478,8 +516,25 @@ export async function updateSuperAdminServiceSubscriptionSettings(req: AuthReque
     action: 'CLIENT_SERVICE_SUBSCRIPTION_SETTINGS_UPDATED',
     entityType: 'ClientServiceSubscription',
     entityId: subscription.id,
+    metadata: {
+      oldValues: existingSubscription
+        ? {
+            taxRate: Number(existingSubscription.taxRate),
+            billingDay: existingSubscription.billingDay,
+            serviceSubscriptionStatus: existingSubscription.serviceSubscriptionStatus,
+            subscriptionStartDate: existingSubscription.subscriptionStartDate,
+          }
+        : null,
+      newValues: {
+        taxRate: Number(subscription.taxRate),
+        billingDay: subscription.billingDay,
+        serviceSubscriptionStatus: subscription.serviceSubscriptionStatus,
+        subscriptionStartDate: subscription.subscriptionStartDate,
+      },
+    },
   });
 
+  res.setHeader('Cache-Control', 'no-store');
   res.json({ subscription, serviceBilling: await getServiceBillingSummary(account.id) });
 }
 

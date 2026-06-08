@@ -7,6 +7,11 @@ import {
 } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { addBillingInterval, dueDateFromPaymentDay } from './billingCalculations.service';
+import { ensureServiceSubscription } from './clientServiceBilling.service';
+
+function toMoney(value: number) {
+  return new Prisma.Decimal(value).toDecimalPlaces(2);
+}
 
 export async function ensureClientBillingSettings(accountId: string) {
   const account = await prisma.businessAccount.findUnique({
@@ -114,6 +119,18 @@ export async function saveClientBillingSettings(
       },
     }),
   ]);
+
+  if (input.monthlySubscriptionAmount > 0) {
+    const monthlyDollars = input.monthlySubscriptionAmount / 100;
+    await ensureServiceSubscription(accountId);
+    await prisma.clientServiceSubscription.update({
+      where: { businessId: accountId },
+      data: {
+        introMonthlyFee: toMoney(monthlyDollars),
+        standardMonthlyFee: toMoney(monthlyDollars),
+      },
+    });
+  }
 
   return { account: updatedAccount, settings: updatedSettings };
 }

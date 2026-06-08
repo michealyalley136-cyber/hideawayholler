@@ -279,8 +279,8 @@ export default function HideawayHollerClientPage() {
     }
   }, []);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const response = await api<ClientDashboard>('/business-billing/super-admin-client-dashboard');
@@ -289,12 +289,21 @@ export default function HideawayHollerClientPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to load client dashboard');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [populateBillingForm]);
 
   useEffect(() => {
-    loadDashboard();
+    void loadDashboard();
+    const timer = window.setInterval(() => void loadDashboard(true), 20_000);
+    const refreshOnFocus = () => void loadDashboard(true);
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
   }, [loadDashboard]);
 
   const runAction = async (key: string, action: () => Promise<void>, successMessage: string) => {
@@ -373,7 +382,7 @@ export default function HideawayHollerClientPage() {
               Manage billing configuration, invoices, payments, and account health for AppCreatives LLC.
             </p>
           </div>
-          <Button variant="outline" onClick={loadDashboard} loading={loading}>
+          <Button variant="outline" onClick={() => loadDashboard()} loading={loading}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>

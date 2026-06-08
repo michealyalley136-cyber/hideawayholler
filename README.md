@@ -96,7 +96,7 @@ Base URL: `/api`
 | Module | Endpoints |
 |--------|-----------|
 | Auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
-| Dashboard | `GET /dashboard/admin`, `GET /dashboard/resident` |
+| Dashboard | `GET /admin/dashboard`, `GET /dashboard/admin` (alias), `GET /dashboard/resident` |
 | Seasons | `GET/POST /seasons`, `POST /seasons/:id/end` |
 | Profiles | `GET/PATCH /profiles`, `GET /profiles/residents` |
 | Applications | `GET/POST /applications`, `PATCH /applications/:id/review` |

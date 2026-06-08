@@ -8,7 +8,14 @@ const router = Router();
 router.get('/', authenticate, community.listCommunityPosts);
 router.get('/mine', authenticate, community.listCommunityPosts);
 router.get('/pending', authenticate, authorizeAdmin, community.listCommunityPosts);
+router.post('/memory', authenticate, community.createCommunityPost);
 router.post('/', authenticate, upload.array('photos', 10), community.createCommunityPost);
+// Vercel-safe single-segment moderation routes (postId in body)
+router.post('/approve', authenticate, authorizeAdmin, community.approveCommunityPost);
+router.post('/reject', authenticate, authorizeAdmin, community.rejectCommunityPost);
+router.post('/delete', authenticate, community.deleteCommunityPost);
+router.post('/pin', authenticate, authorizeAdmin, community.pinCommunityPost);
+router.post('/unpin', authenticate, authorizeAdmin, community.unpinCommunityPost);
 router.post('/:postId/approve', authenticate, authorizeAdmin, community.approveCommunityPost);
 router.post('/:postId/reject', authenticate, authorizeAdmin, community.rejectCommunityPost);
 router.delete('/:postId', authenticate, community.deleteCommunityPost);

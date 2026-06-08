@@ -23,8 +23,10 @@ import settingsRoutes from './settings.routes';
 import houseAssignmentRoutes from './houseAssignment.routes';
 import sosSettingsRoutes from './sosSettings.routes';
 import businessBillingRoutes from './businessBilling.routes';
+import communityRoutes from './community.routes';
 import * as sos from '../controllers/sos.controller';
 import * as dashboard from '../controllers/dashboard.controller';
+import { getSuperAdminClientDashboard } from '../controllers/superAdminBilling.controller';
 import { authenticate, authorizeAdmin, authorizeSuperAdmin } from '../middleware/auth';
 
 const router = Router();
@@ -60,6 +62,9 @@ router.use('/settings', settingsRoutes);
 router.use('/sos-settings', sosSettingsRoutes);
 router.use('/house-assignments', houseAssignmentRoutes);
 router.use('/business-billing', businessBillingRoutes);
+router.use('/community', communityRoutes);
 router.get('/super-admin/sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
+// Vercel-safe alias for super admin client dashboard
+router.get('/super-admin-hideaway-holler', authenticate, authorizeSuperAdmin, getSuperAdminClientDashboard);
 
 export default router;

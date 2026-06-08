@@ -58,6 +58,7 @@ export default function ResidentDashboard() {
             {[
               { href: '/weather', label: 'View Weather' },
               { href: '/maintenance', label: 'Submit Maintenance' },
+              { href: '/community-memories', label: 'Community Memories' },
               { href: '/internet', label: 'View Wi-Fi' },
               { href: '/dashboard/emergency-sos', label: 'Emergency SOS' },
               { href: '/transportation', label: 'Transportation' },

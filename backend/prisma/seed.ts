@@ -1,4 +1,18 @@
-import { PrismaClient, UserRole, ResidentStatus, NoticeCategory, LocalGuideCategory, PaymentStatus, PaymentType, MaintenanceStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  UserRole,
+  ResidentStatus,
+  NoticeCategory,
+  LocalGuideCategory,
+  PaymentStatus,
+  PaymentType,
+  MaintenanceStatus,
+  ApprovalStatus,
+  CommunityPostType,
+  SupplyRequestStatus,
+  SosAlertStatus,
+  BusinessSetupFeeStatus,
+} from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -221,14 +235,38 @@ async function main() {
     },
   });
 
-  const existingProperty = await prisma.property.findFirst({ where: { name: 'Hideaway Holler Main' } });
-  if (existingProperty) {
-    await ensureAnimalHouses(existingProperty.id);
-    console.log('Seed completed (data already exists).');
-    return;
-  }
+  const resident2 = await prisma.user.upsert({
+    where: { email: 'carlos@example.com' },
+    update: {},
+    create: {
+      email: 'carlos@example.com',
+      passwordHash,
+      role: UserRole.RESIDENT,
+      profile: {
+        create: {
+          fullName: 'Carlos Mendez',
+          phone: '+52-55-9876-5432',
+          country: 'Mexico',
+          currentStatus: ResidentStatus.ROOM_ASSIGNED,
+        },
+      },
+    },
+  });
 
-  const property = await prisma.property.create({
+  await prisma.seasonResident.upsert({
+    where: { userId_seasonId: { userId: resident2.id, seasonId: summer2026.id } },
+    update: {},
+    create: {
+      userId: resident2.id,
+      seasonId: summer2026.id,
+      status: ResidentStatus.ROOM_ASSIGNED,
+    },
+  });
+
+  const existingProperty = await prisma.property.findFirst({ where: { name: 'Hideaway Holler Main' } });
+  let property = existingProperty;
+  if (!existingProperty) {
+  property = await prisma.property.create({
     data: {
       name: 'Hideaway Holler Main',
       address: '123 Holler Lane',
@@ -267,11 +305,15 @@ async function main() {
     },
     include: { buildings: { include: { rooms: { include: { beds: true } } } } },
   });
+  }
 
+  if (property) {
+    await ensureAnimalHouses(property.id);
+  }
+
+  if (property && !existingProperty) {
   const room101 = property.buildings[0].rooms[0];
   const bedA = room101.beds[0];
-
-  await ensureAnimalHouses(property.id);
 
   await prisma.roomAssignment.create({
     data: {
@@ -281,8 +323,10 @@ async function main() {
       seasonId: summer2026.id,
     },
   });
+  }
 
-  await prisma.lease.create({
+  const existingLease = await prisma.lease.findFirst({ where: { userId: resident.id, seasonId: summer2026.id } });
+  if (!existingLease) await prisma.lease.create({
     data: {
       userId: resident.id,
       seasonId: summer2026.id,
@@ -295,7 +339,8 @@ async function main() {
     },
   });
 
-  await prisma.payment.createMany({
+  const paymentCount = await prisma.payment.count({ where: { userId: resident.id } });
+  if (!paymentCount) await prisma.payment.createMany({
     data: [
       {
         userId: resident.id,
@@ -333,7 +378,8 @@ async function main() {
     ],
   });
 
-  await prisma.notice.createMany({
+  const noticeCount = await prisma.notice.count();
+  if (!noticeCount) await prisma.notice.createMany({
     data: [
       {
         seasonId: summer2026.id,
@@ -359,7 +405,8 @@ async function main() {
     ],
   });
 
-  await prisma.maintenanceRequest.create({
+  const maintenanceCount = await prisma.maintenanceRequest.count();
+  if (!maintenanceCount) await prisma.maintenanceRequest.create({
     data: {
       userId: resident.id,
       category: 'PLUMBING',
@@ -368,7 +415,8 @@ async function main() {
     },
   });
 
-  const album = await prisma.galleryAlbum.create({
+  const albumCount = await prisma.galleryAlbum.count();
+  const album = albumCount ? null : await prisma.galleryAlbum.create({
     data: {
       seasonId: summer2026.id,
       title: 'Property Photos',
@@ -387,7 +435,8 @@ async function main() {
     ],
   });
 
-  await prisma.emergencyContact.createMany({
+  const emergencyCount = await prisma.emergencyContact.count();
+  if (!emergencyCount) await prisma.emergencyContact.createMany({
     data: [
       { label: '911', phone: '911', description: 'Life-threatening emergencies', sortOrder: 1 },
       { label: 'Property Management', phone: '+1-865-555-0100', description: 'Hideaway Holler office', sortOrder: 2 },
@@ -398,18 +447,142 @@ async function main() {
     ],
   });
 
-  await prisma.checkIn.create({
-    data: {
-      userId: resident.id,
-      seasonId: summer2026.id,
-      arrivalConfirmed: true,
-      rulesAccepted: true,
-      roomCondition: 'Good condition, minor wear on carpet.',
-      adminApproved: true,
-      adminApprovedAt: new Date('2026-05-15'),
-      completedAt: new Date('2026-05-15'),
-    },
-  });
+  const approvedCheckIn = await prisma.checkIn.findFirst({ where: { userId: resident.id, adminApproved: true } });
+  if (!approvedCheckIn) {
+    await prisma.checkIn.create({
+      data: {
+        userId: resident.id,
+        seasonId: summer2026.id,
+        arrivalConfirmed: true,
+        rulesAccepted: true,
+        roomCondition: 'Good condition, minor wear on carpet.',
+        adminApproved: true,
+        adminApprovedAt: new Date('2026-05-15'),
+        completedAt: new Date('2026-05-15'),
+      },
+    });
+  }
+
+  const pendingCheckIn = await prisma.checkIn.findFirst({ where: { userId: resident2.id, adminApproved: false } });
+  if (!pendingCheckIn) {
+    await prisma.checkIn.create({
+      data: {
+        userId: resident2.id,
+        seasonId: summer2026.id,
+        arrivalConfirmed: true,
+        rulesAccepted: true,
+        roomCondition: 'Ready for admin review — towels and bedding requested.',
+        completedAt: new Date(),
+      },
+    });
+  }
+
+  const supplyCount = await prisma.supplyRequest.count();
+  if (!supplyCount) {
+    await prisma.supplyRequest.createMany({
+      data: [
+        { userId: resident.id, house: 'Bear House', supplyType: 'TOILET_PAPER', quantity: 2, notes: 'Need extra bath towels', status: SupplyRequestStatus.OPEN },
+        { userId: resident2.id, house: 'Elk House', supplyType: 'CLEANING_SUPPLIES', quantity: 1, notes: 'All-purpose cleaner', status: SupplyRequestStatus.OPEN },
+      ],
+    });
+  }
+
+  const communityCount = await prisma.communityPost.count();
+  if (!communityCount) {
+    await prisma.communityPost.create({
+      data: {
+        authorId: resident.id,
+        authorRole: UserRole.RESIDENT,
+        caption: 'First sunset at Hideaway Holler — welcome week memories.',
+        postType: CommunityPostType.RESIDENT_MEMORY,
+        approvalStatus: ApprovalStatus.APPROVED,
+        images: {
+          create: [{
+            imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1200&q=80',
+            imageOrder: 0,
+          }],
+        },
+      },
+    });
+    await prisma.communityPost.create({
+      data: {
+        authorId: resident2.id,
+        authorRole: UserRole.RESIDENT,
+        caption: 'Movie night in Deer House common room.',
+        postType: CommunityPostType.COMMUNITY_ACTIVITY,
+        approvalStatus: ApprovalStatus.PENDING,
+        images: {
+          create: [{
+            imageUrl: 'https://images.unsplash.com/photo-1517456793572-1cca8c4fc354?auto=format&fit=crop&w=1200&q=80',
+            imageOrder: 0,
+          }],
+        },
+      },
+    });
+  }
+
+  const sosCount = await prisma.sosAlert.count();
+  if (!sosCount) {
+    await prisma.sosAlert.create({
+      data: {
+        residentId: resident.id,
+        residentName: 'Maria Santos',
+        status: SosAlertStatus.RESOLVED,
+        initialLatitude: 35.8687,
+        initialLongitude: -83.5618,
+        currentLatitude: 35.8687,
+        currentLongitude: -83.5618,
+        city: 'Sevierville',
+        state: 'TN',
+        adminAcknowledgedAt: new Date(Date.now() - 3600000),
+        resolvedAt: new Date(Date.now() - 3000000),
+      },
+    });
+  }
+
+  const businessAccount = await prisma.businessAccount.findFirst({ where: { slug: 'hideaway-holler' } });
+  if (businessAccount) {
+    await prisma.businessAccount.update({
+      where: { id: businessAccount.id },
+      data: {
+        setupFeeAmount: 250000,
+        setupFeeStatus: BusinessSetupFeeStatus.SENT,
+        billingEmail: 'billing@hideawayholler.com',
+      },
+    });
+    await prisma.clientBillingSettings.upsert({
+      where: { clientId: businessAccount.id },
+      create: {
+        clientId: businessAccount.id,
+        setupFeeAmount: 250000,
+        setupFeeStatus: BusinessSetupFeeStatus.SENT,
+        monthlySubscriptionAmount: 14900,
+        billingFrequency: 'MONTHLY',
+        paymentDueDay: 1,
+        gracePeriodDays: 7,
+      },
+      update: {
+        setupFeeAmount: 250000,
+        monthlySubscriptionAmount: 14900,
+      },
+    });
+    await prisma.clientServiceSubscription.upsert({
+      where: { businessId: businessAccount.id },
+      create: {
+        businessId: businessAccount.id,
+        serviceSubscriptionStatus: 'active',
+        introMonthlyFee: 149,
+        introDurationMonths: 6,
+        standardMonthlyFee: 99,
+        taxRate: 0,
+        billingDay: 1,
+      },
+      update: {
+        introMonthlyFee: 149,
+        standardMonthlyFee: 99,
+      },
+    });
+  }
 
   console.log('Seed completed.');
   console.log('Seeded demo user emails. Passwords are configured through SEED_DEMO_PASSWORD.');

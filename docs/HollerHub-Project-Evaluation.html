@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HollerHub / Hideaway Holler Portal — Project Evaluation</title>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.4; color: #1a1a1a; max-width: 8.5in; margin: 1in; }
+  h1 { font-size: 22pt; color: #0f4c3a; border-bottom: 2px solid #0f4c3a; padding-bottom: 6px; }
+  h2 { font-size: 16pt; color: #0f4c3a; margin-top: 24px; }
+  h3 { font-size: 13pt; color: #2d5a4a; margin-top: 18px; }
+  h4 { font-size: 11pt; color: #444; margin-top: 14px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 10pt; }
+  th, td { border: 1px solid #bbb; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #e8f5f0; font-weight: bold; }
+  .meta { color: #555; font-size: 10pt; margin-bottom: 20px; }
+  .summary-box { background: #f4faf7; border: 1px solid #b8d4c8; padding: 12px 16px; margin: 16px 0; }
+  ul { margin: 8px 0; }
+  li { margin: 4px 0; }
+  .status-ok { color: #166534; }
+  .status-partial { color: #b45309; }
+  .status-no { color: #b91c1c; }
+  .page-break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<h1>HollerHub / Hideaway Holler Portal</h1>
+<h2 style="margin-top:0; font-size:14pt; color:#555;">Project Evaluation — Scope of Work Done &amp; Remaining</h2>
+<p class="meta"><strong>Prepared:</strong> June 2026 &nbsp;|&nbsp; <strong>Repository:</strong> hollerhub/ &nbsp;|&nbsp; <strong>Production:</strong> hollerhub.vercel.app / hollerhub-api.vercel.app</p>
+
+<div class="summary-box">
+<strong>Executive Summary:</strong> HollerHub is a full-stack resident and operations portal for Hideaway Holler, a J1 student boarding property in Sevierville, Tennessee. The platform serves three audiences: residents/applicants/alumni, Hideaway Holler property admins, and AppCreatives LLC super admins. The application is substantially built — most core operational workflows are API-backed and usable. The largest gaps are production hardening (Vercel routing, deploys, file storage), unfinished modules (community, check-ins admin UI), and integration completion (Square, push notifications, configurable content).
+</div>
+
+<h2>1. Architecture Overview</h2>
+<table>
+  <tr><th>Layer</th><th>Technology</th><th>Notes</th></tr>
+  <tr><td>Frontend</td><td>Next.js 15, TypeScript, Tailwind CSS</td><td>Role-based pages, production API proxy at /api/backend/*</td></tr>
+  <tr><td>Backend</td><td>Express 5, TypeScript, Prisma</td><td>Monolithic app exported as Vercel serverless functions</td></tr>
+  <tr><td>Database</td><td>PostgreSQL</td><td>40+ models across resident ops, billing, SOS</td></tr>
+  <tr><td>Auth</td><td>JWT + 5 roles</td><td>Client-side route guards; no refresh tokens</td></tr>
+  <tr><td>Deploy</td><td>Two Vercel projects</td><td>frontend/ and backend/ root directories</td></tr>
+</table>
+
+<h2>2. What Has Been Built</h2>
+
+<h3>2.1 Authentication &amp; User Roles <span class="status-ok">(Complete)</span></h3>
+<table>
+  <tr><th>Role</th><th>Purpose</th></tr>
+  <tr><td>APPLICANT</td><td>Pre-arrival application and journey</td></tr>
+  <tr><td>RESIDENT</td><td>Active housing resident</td></tr>
+  <tr><td>ALUMNI</td><td>Post-stay access and reapply</td></tr>
+  <tr><td>ADMIN</td><td>Hideaway Holler property operations</td></tr>
+  <tr><td>SUPER_ADMIN</td><td>AppCreatives platform operator</td></tr>
+</table>
+<p>Built: register, login, /auth/me, role-based redirects, session timeout, audit logging on key actions.</p>
+
+<h3>2.2 Resident Journey (Applicant → Alumni) <span class="status-ok">(Largely Complete)</span></h3>
+<table>
+  <tr><th>Stage</th><th>Frontend</th><th>Backend</th><th>Status</th></tr>
+  <tr><td>Apply to season</td><td>/apply</td><td>/applications</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Profile &amp; documents</td><td>/profile</td><td>/profiles</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Lease workflow</td><td>/leases</td><td>/leases + PDF signing</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Payments (rent/deposit)</td><td>/payments</td><td>/payments</td><td class="status-partial">Manual tracking only</td></tr>
+  <tr><td>Check-in</td><td>/check-in</td><td>/check-in</td><td class="status-ok">Resident side complete</td></tr>
+  <tr><td>Active residency</td><td>/dashboard</td><td>/dashboard/resident</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Maintenance, supplies, reviews</td><td>Multiple pages</td><td>CRUD APIs</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Check-out</td><td>/check-out</td><td>/check-out</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Alumni</td><td>/alumni, /alumni/history</td><td>Profile + lease history</td><td class="status-ok">Complete</td></tr>
+</table>
+
+<h3>2.3 Housing &amp; Assignments <span class="status-ok">(Complete — dual model)</span></h3>
+<p>Two housing models exist: (1) Named houses (Bear, Deer, Elk, Fox) — primary model for dashboard and supply requests; (2) Property → Building → Room → Bed hierarchy — secondary parallel system. Admin can create/archive houses, assign residents, and track occupancy.</p>
+
+<h3>2.4 Admin Operations <span class="status-partial">(Mostly Complete)</span></h3>
+<table>
+  <tr><th>Module</th><th>Page</th><th>Status</th></tr>
+  <tr><td>Dashboard stats</td><td>/admin/dashboard</td><td class="status-ok">Built (routing recently fixed)</td></tr>
+  <tr><td>Residents list</td><td>/admin/residents</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Resident detail</td><td>/admin/residents/[id]</td><td class="status-partial">Read-only, limited</td></tr>
+  <tr><td>Applications</td><td>/admin/applications</td><td class="status-ok">Approve/reject</td></tr>
+  <tr><td>Housing</td><td>/admin/housing</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Leases</td><td>/admin/leases</td><td class="status-ok">Full workflow</td></tr>
+  <tr><td>Payments</td><td>/admin/payments</td><td class="status-ok">Manual mark paid / verify receipts</td></tr>
+  <tr><td>Notices</td><td>/admin/notices</td><td class="status-partial">Create only, no edit/delete</td></tr>
+  <tr><td>Maintenance</td><td>/admin/maintenance</td><td class="status-ok">Status workflow</td></tr>
+  <tr><td>Supply requests</td><td>/admin/supply-requests</td><td class="status-ok">Fulfill requests</td></tr>
+  <tr><td>Reviews</td><td>/admin/reviews</td><td class="status-ok">Moderation</td></tr>
+  <tr><td>Seasons</td><td>/admin/seasons</td><td class="status-partial">List + end season; no create UI</td></tr>
+  <tr><td>Gallery</td><td>/admin/gallery</td><td class="status-partial">Read-only list</td></tr>
+  <tr><td>Local guide</td><td>/admin/local-guide</td><td class="status-partial">Read-only list</td></tr>
+  <tr><td>Check-ins approval</td><td>/admin/check-ins</td><td class="status-no">Stub — no UI or API calls</td></tr>
+  <tr><td>Billing (service sub)</td><td>/admin/billing/subscription</td><td class="status-ok">Synced with Super Admin</td></tr>
+</table>
+
+<h3>2.5 SOS Emergency System <span class="status-ok">(Most Polished Vertical)</span></h3>
+<table>
+  <tr><th>Capability</th><th>Status</th></tr>
+  <tr><td>Resident hold-to-trigger SOS (GPS + location updates)</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Reverse geocoding (OpenStreetMap Nominatim)</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Admin polling + modal + siren (desktop)</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Acknowledge / resolve / mute</td><td class="status-ok">Fixed for Vercel routing</td></tr>
+  <tr><td>SOS history (admin + super admin logs)</td><td class="status-ok">Complete</td></tr>
+  <tr><td>SOS settings (sound, escalation)</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Mobile push notifications</td><td class="status-no">Intentionally disabled</td></tr>
+  <tr><td>Web push on trigger</td><td class="status-partial">Code exists, never called</td></tr>
+  <tr><td>SMS fallback</td><td class="status-partial">Env-gated, generic HTTP</td></tr>
+</table>
+<p><strong>Business rules:</strong> ADMIN = active emergency responder; SUPER_ADMIN = logs/oversight only; mobile push off.</p>
+
+<h3>2.6 Super Admin / AppCreatives Platform <span class="status-partial">(Single Client)</span></h3>
+<table>
+  <tr><th>Capability</th><th>Status</th></tr>
+  <tr><td>Client dashboard (/super-admin/clients/hideaway-holler)</td><td class="status-ok">Complete (~700 lines)</td></tr>
+  <tr><td>Service billing (intro $149/mo × 6, then $99/mo)</td><td class="status-ok">ClientService* models</td></tr>
+  <tr><td>Invoice generation &amp; manual payments</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Account health scoring &amp; audit logs</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Multi-client support</td><td class="status-no">Only hideaway-holler hardcoded</td></tr>
+  <tr><td>Stripe platform billing</td><td class="status-partial">Built, env-dependent</td></tr>
+  <tr><td>Square payment links</td><td class="status-no">Schema fields only</td></tr>
+</table>
+
+<h3>2.7 Billing Data Sync <span class="status-partial">(Recent — needs deploy verify)</span></h3>
+<p>Previously Super Admin and Admin read from different billing table families. Now unified via getServiceBillingSummary(). Delivered: shared ClientService* data, /api/admin/billing/* aliases, 20s polling, cache: no-store, audit logs with old/new values.</p>
+
+<h3>2.8 Resident Portal Extras</h3>
+<table>
+  <tr><th>Feature</th><th>Status</th></tr>
+  <tr><td>Weather (Open-Meteo + fallback)</td><td class="status-ok">Complete</td></tr>
+  <tr><td>Transportation / Wi-Fi / arrival info</td><td class="status-partial">Static hideawayInfo.ts</td></tr>
+  <tr><td>Community gallery, local guide, emergency contacts</td><td class="status-ok">API-backed</td></tr>
+  <tr><td>PWA install prompt &amp; offline page</td><td class="status-ok">Complete</td></tr>
+</table>
+
+<h3>2.9 Public / Marketing <span class="status-partial">(Minimal)</span></h3>
+<p>Portal-first design: / redirects to /login. Login page branded Hideaway Holler + AppCreatives. Full marketing site data exists in code but is unused.</p>
+
+<div class="page-break"></div>
+
+<h2>3. Scope of Work Completed (Recent Sessions)</h2>
+<table>
+  <tr><th>Workstream</th><th>Deliverables</th></tr>
+  <tr><td>Super Admin billing dashboard</td><td>Editable billing, automated dates, service subscription system</td></tr>
+  <tr><td>Service billing model</td><td>ClientServiceSubscription, invoices, manual payments</td></tr>
+  <tr><td>Production API proxy</td><td>Frontend /api/backend/* proxy for CORS-free production</td></tr>
+  <tr><td>Vercel-safe routes</td><td>Single-segment SOS routes, super-admin fallbacks</td></tr>
+  <tr><td>SOS system hardening</td><td>Acknowledge/resolve 404 fix, proxy rewrite, SW cache fix, modal fixes</td></tr>
+  <tr><td>Login branding</td><td>Hideaway Holler portal design</td></tr>
+  <tr><td>Billing sync</td><td>Shared data source between Super Admin and Admin</td></tr>
+  <tr><td>Admin dashboard 404 fix</td><td>Dedicated proxy routes, admin-dashboard alias, SW v4</td></tr>
+</table>
+
+<h2>4. What Is Partial, Stubbed, or Not Built</h2>
+
+<h3>4.1 Critical / Production Blockers</h3>
+<table>
+  <tr><th>Item</th><th>Impact</th><th>Notes</th></tr>
+  <tr><td>Vercel deploy verification</td><td>High</td><td>Fixes in commit 59ec585 may not be live on both projects</td></tr>
+  <tr><td>File uploads on Vercel</td><td>High</td><td>Local filesystem — not durable on serverless</td></tr>
+  <tr><td>Cached frontend bundles</td><td>Medium</td><td>Old JS may call legacy API paths</td></tr>
+  <tr><td>README outdated</td><td>Low</td><td>Says "No Stripe" but Stripe integration exists</td></tr>
+</table>
+
+<h3>4.2 Unfinished Features (Code Exists, Not Live)</h3>
+<table>
+  <tr><th>Feature</th><th>Backend</th><th>Frontend</th><th>Gap</th></tr>
+  <tr><td>Community social feed</td><td>Controller + schema built</td><td>Components built</td><td>Routes not mounted; no pages</td></tr>
+  <tr><td>SOS push notifications</td><td>sendSosPushNotifications()</td><td>SW push handlers</td><td>Never called on trigger</td></tr>
+  <tr><td>Square checkout</td><td>Schema fields</td><td>Pay Now button</td><td>No Square SDK</td></tr>
+  <tr><td>Admin check-ins UI</td><td>API exists</td><td>Stub page</td><td>No approval UI</td></tr>
+  <tr><td>Weather alerts on dashboard</td><td>Hardcoded 0</td><td>Static alerts</td><td>No real integration</td></tr>
+  <tr><td>Multi-client Super Admin</td><td>getDefaultBusinessAccount()</td><td>hideaway-holler only</td><td>Single-tenant</td></tr>
+</table>
+
+<h3>4.3 Technical Debt</h3>
+<ul>
+  <li>Dual housing models (named houses vs property/room hierarchy)</li>
+  <li>Dual push device models (AdminDevice + AdminPushSubscription)</li>
+  <li>Dual billing families (Business* Stripe legacy + ClientService* manual)</li>
+  <li>No JWT refresh / blacklist — stateless logout only</li>
+  <li>No RBAC beyond role enum</li>
+  <li>Missing PWA assets (public/icons/, admin-sos.webmanifest)</li>
+  <li>Lease download uses direct apiUrl instead of browser proxy</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>5. Work Left To Do (Prioritized)</h2>
+
+<h3>P0 — Production Stability (Do First)</h3>
+<ol>
+  <li>Confirm both Vercel projects deployed commit 59ec585 (frontend + backend)</li>
+  <li>Verify admin dashboard returns 200/401, not 404, at /api/backend/admin/dashboard</li>
+  <li>Migrate uploads to Vercel Blob, S3, or similar</li>
+  <li>End-to-end billing sync QA — Super Admin change → Admin billing updates</li>
+  <li>Hard refresh / SW unregister documentation for admins after deploys</li>
+</ol>
+
+<h3>P1 — Complete Existing Modules</h3>
+<ol start="6">
+  <li>Mount community routes and build resident/admin community pages</li>
+  <li>Build admin check-ins approval UI</li>
+  <li>Admin seasons create UI</li>
+  <li>Admin gallery &amp; local guide full CRUD</li>
+  <li>Resident detail admin page — edit actions, document review</li>
+</ol>
+
+<h3>P2 — Integrations &amp; Platform</h3>
+<ol start="11">
+  <li>Square payment integration for service invoices</li>
+  <li>Stripe production config (webhook, price ID, billing portal)</li>
+  <li>SOS push notification wiring or remove dead code</li>
+  <li>SMS provider setup (Twilio or equivalent)</li>
+  <li>Multi-client Super Admin — client list, per-client routing</li>
+</ol>
+
+<h3>P3 — Content &amp; UX Polish</h3>
+<ol start="16">
+  <li>Public marketing landing page</li>
+  <li>Admin-configurable site content (Wi-Fi, transportation, checklists)</li>
+  <li>Weather alerts integration on admin dashboard</li>
+  <li>PWA asset completion (icons, manifests)</li>
+  <li>Full portal UI/UX QA pass</li>
+</ol>
+
+<h3>P4 — Hardening &amp; Scale</h3>
+<ol start="21">
+  <li>Consolidate housing models</li>
+  <li>JWT refresh tokens or session management</li>
+  <li>S3 storage adapter</li>
+  <li>Automated API integration tests</li>
+  <li>Monitoring / error tracking (Sentry)</li>
+</ol>
+
+<h2>6. Feature Completeness Matrix</h2>
+<table>
+  <tr><th>Domain</th><th>Built</th><th>Partial</th><th>Not Started</th></tr>
+  <tr><td>Auth &amp; roles</td><td>Yes</td><td></td><td></td></tr>
+  <tr><td>Resident journey</td><td>Yes</td><td></td><td></td></tr>
+  <tr><td>Housing (named houses)</td><td>Yes</td><td></td><td></td></tr>
+  <tr><td>Leases + PDF</td><td>Yes</td><td></td><td></td></tr>
+  <tr><td>Resident payments (manual)</td><td>Yes</td><td></td><td></td></tr>
+  <tr><td>Notices, maintenance, supplies</td><td>Yes</td><td></td><td></td></tr>
+  <tr><td>Reviews, gallery, local guide</td><td></td><td>Admin CRUD thin</td><td></td></tr>
+  <tr><td>Check-in/out</td><td></td><td>Admin check-in UI missing</td><td></td></tr>
+  <tr><td>Admin dashboard</td><td>Yes</td><td></td><td></td></tr>
+  <tr><td>SOS system</td><td>Yes</td><td>push/SMS</td><td></td></tr>
+  <tr><td>Super Admin console</td><td>Yes</td><td>single client</td><td></td></tr>
+  <tr><td>Service billing sync</td><td>Yes</td><td>deploy verify</td><td></td></tr>
+  <tr><td>Community social</td><td></td><td>code only</td><td></td></tr>
+  <tr><td>Stripe integration</td><td></td><td>env-dependent</td><td></td></tr>
+  <tr><td>Square integration</td><td></td><td></td><td>Yes</td></tr>
+  <tr><td>Public marketing site</td><td></td><td></td><td>Yes</td></tr>
+  <tr><td>Cloud file storage</td><td></td><td></td><td>Yes</td></tr>
+  <tr><td>Multi-tenant clients</td><td></td><td></td><td>Yes</td></tr>
+</table>
+
+<h2>7. Bottom Line</h2>
+<div class="summary-box">
+<p><strong>What you have:</strong> A functional, role-based resident and property management portal with a strong SOS vertical, a working Super Admin billing console, and broad API coverage for day-to-day Hideaway Holler operations. The resident mobile experience (bottom nav, PWA prompts, emergency SOS) is thoughtfully designed.</p>
+<p><strong>What's blocking production confidence:</strong> Vercel routing/deploy consistency, durable file storage, and verification that recent billing/dashboard fixes are live.</p>
+<p><strong>Biggest unrealized value:</strong> Community features (fully coded but not wired), admin check-ins UI, Square/Stripe payment completion, and admin-managed informational content.</p>
+<p><strong>Rough completion estimate:</strong></p>
+<ul>
+  <li>Core resident + admin operations: ~85% complete</li>
+  <li>Super Admin / platform billing: ~75% complete</li>
+  <li>Production hardening: ~60% complete</li>
+  <li>Community / marketing / advanced integrations: ~25% complete</li>
+</ul>
+</div>
+
+<p style="margin-top:40px; font-size:9pt; color:#888;">Document generated from HollerHub codebase evaluation. Private — Hideaway Holler / AppCreatives LLC.</p>
+
+</body>
+</html>

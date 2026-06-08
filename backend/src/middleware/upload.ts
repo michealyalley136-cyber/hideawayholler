@@ -2,7 +2,7 @@ import multer from 'multer';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+const UPLOAD_DIR = process.env.UPLOAD_DIR || (process.env.VERCEL === '1' ? '/tmp/uploads' : './uploads');
 const maxSize = (parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10) || 10) * 1024 * 1024;
 
 const storage = multer.diskStorage({

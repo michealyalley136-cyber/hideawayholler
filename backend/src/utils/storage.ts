@@ -2,8 +2,8 @@ import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
-const PRIVATE_UPLOAD_DIR = process.env.PRIVATE_UPLOAD_DIR || './private_uploads';
+const UPLOAD_DIR = process.env.UPLOAD_DIR || (process.env.VERCEL === '1' ? '/tmp/uploads' : './uploads');
+const PRIVATE_UPLOAD_DIR = process.env.PRIVATE_UPLOAD_DIR || (process.env.VERCEL === '1' ? '/tmp/private_uploads' : './private_uploads');
 
 export function ensureUploadDirs() {
   const dirs = ['documents', 'receipts', 'maintenance', 'gallery', 'checkin', 'checkout', 'avatars'];

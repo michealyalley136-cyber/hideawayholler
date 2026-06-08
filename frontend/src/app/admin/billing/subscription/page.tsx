@@ -245,7 +245,7 @@ export default function BusinessSubscriptionPage() {
                     </div>
                   </div>
 
-                  {unpaidInvoice?.squareCheckoutUrl && (
+                  {unpaidInvoice?.squareCheckoutUrl ? (
                     <a
                       href={unpaidInvoice.squareCheckoutUrl}
                       target="_blank"
@@ -255,7 +255,9 @@ export default function BusinessSubscriptionPage() {
                       Pay Now
                       <ExternalLink className="h-4 w-4" />
                     </a>
-                  )}
+                  ) : billing && billing.unpaidInvoices > 0 ? (
+                    <p className="text-sm text-slate-600">Payment link pending setup. Contact AppCreatives LLC to complete payment.</p>
+                  ) : null}
                 </div>
               )}
             </CardBody>

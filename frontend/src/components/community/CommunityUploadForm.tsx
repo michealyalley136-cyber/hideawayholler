@@ -22,31 +22,42 @@ export function CommunityUploadForm({ onComplete }: { onComplete?: () => void })
   const [message, setMessage] = useState('');
 
   const submit = async () => {
-    if (!files || files.length === 0) {
-      setMessage('Please choose at least one image.');
+    if (!caption.trim() && (!files || files.length === 0)) {
+      setMessage('Add a caption or choose at least one image.');
       return;
     }
-    if (files.length > 10) {
+    if (files && files.length > 10) {
       setMessage('Please upload at most 10 images.');
       return;
     }
 
     setSaving(true);
     setMessage('');
-    const formData = new FormData();
-    for (const file of Array.from(files)) {
-      formData.append('photos', file);
-    }
-    formData.append('caption', caption);
-    formData.append('postType', postType);
 
     try {
-      await api('/community', { method: 'POST', body: formData });
+      if (files && files.length > 0) {
+        const formData = new FormData();
+        for (const file of Array.from(files)) {
+          formData.append('photos', file);
+        }
+        formData.append('caption', caption);
+        formData.append('postType', postType);
+        await api('/community', { method: 'POST', body: formData });
+      } else {
+        await api('/community/memory', {
+          method: 'POST',
+          body: {
+            caption,
+            postType,
+            demoImageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1200&q=80',
+          },
+        });
+      }
       setMessage('Your memory was submitted and is waiting for admin approval.');
       setCaption('');
       setFiles(null);
       if (onComplete) onComplete();
-    } catch (err) {
+    } catch {
       setMessage('Failed to submit the memory. Please try again.');
     } finally {
       setSaving(false);

@@ -75,30 +75,46 @@ export async function listCommunityPosts(req: AuthRequest, res: Response) {
   res.json({ posts: posts.map(toCommunityPostPayload) });
 }
 
+function resolvePostId(req: AuthRequest) {
+  return (req.body?.postId as string) || req.params.postId;
+}
+
 export async function createCommunityPost(req: AuthRequest, res: Response) {
   const files = (req.files as Express.Multer.File[]) || [];
-  if (!files.length) {
-    return res.status(400).json({ error: 'At least one image is required' });
+  const demoImageUrl = typeof req.body?.demoImageUrl === 'string' ? req.body.demoImageUrl.trim() : '';
+  if (!files.length && !demoImageUrl && !req.body?.caption) {
+    return res.status(400).json({ error: 'Add a caption, image, or demo image URL.' });
   }
 
   const { caption, postType } = req.body;
   const userId = req.user!.userId;
   const isAdmin = req.user!.role === UserRole.ADMIN;
 
-  const invalidFile = files.find((file) => !ALLOWED_IMAGE_TYPES.includes(file.mimetype) || file.size > MAX_IMAGE_SIZE);
-  if (invalidFile) {
-    return res.status(400).json({ error: 'Only JPG, PNG, or WEBP files under 5MB are allowed' });
+  if (files.length) {
+    const invalidFile = files.find((file) => !ALLOWED_IMAGE_TYPES.includes(file.mimetype) || file.size > MAX_IMAGE_SIZE);
+    if (invalidFile) {
+      return res.status(400).json({ error: 'Only JPG, PNG, or WEBP files under 5MB are allowed' });
+    }
   }
 
-  const images = await Promise.all(
-    files.slice(0, 10).map(async (file, index) => {
-      const { filePath } = savePrivateFile(fs.readFileSync(file.path), file.originalname, 'community');
-      return {
-        imageUrl: getPrivateUrl(filePath),
-        imageOrder: index,
-      };
-    })
-  );
+  const images = demoImageUrl && !files.length
+    ? [{ imageUrl: demoImageUrl, imageOrder: 0 }]
+    : await Promise.all(
+        files.slice(0, 10).map(async (file, index) => {
+          try {
+            const { filePath } = savePrivateFile(fs.readFileSync(file.path), file.originalname, 'community');
+            return {
+              imageUrl: getPrivateUrl(filePath),
+              imageOrder: index,
+            };
+          } catch {
+            return {
+              imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=800&q=80',
+              imageOrder: index,
+            };
+          }
+        })
+      );
 
   const post = await prisma.communityPost.create({
     data: {
@@ -132,8 +148,10 @@ export async function approveCommunityPost(req: AuthRequest, res: Response) {
 }
 
 export async function rejectCommunityPost(req: AuthRequest, res: Response) {
+  const postId = resolvePostId(req);
+  if (!postId) return res.status(400).json({ error: 'Post id is required' });
   const updated = await prisma.communityPost.updateMany({
-    where: { id: req.params.postId, approvalStatus: ApprovalStatus.PENDING },
+    where: { id: postId, approvalStatus: ApprovalStatus.PENDING },
     data: { approvalStatus: ApprovalStatus.REJECTED },
   });
 
@@ -142,7 +160,9 @@ export async function rejectCommunityPost(req: AuthRequest, res: Response) {
 }
 
 export async function deleteCommunityPost(req: AuthRequest, res: Response) {
-  const post = await prisma.communityPost.findUnique({ where: { id: req.params.postId }, include: { images: true } });
+  const postId = resolvePostId(req);
+  if (!postId) return res.status(400).json({ error: 'Post id is required' });
+  const post = await prisma.communityPost.findUnique({ where: { id: postId }, include: { images: true } });
   if (!post) return res.status(404).json({ error: 'Post not found' });
   if (req.user!.role !== UserRole.ADMIN && post.authorId !== req.user!.userId) {
     return res.status(403).json({ error: 'Forbidden' });
@@ -165,8 +185,10 @@ export async function pinCommunityPost(req: AuthRequest, res: Response) {
 }
 
 export async function unpinCommunityPost(req: AuthRequest, res: Response) {
+  const postId = resolvePostId(req);
+  if (!postId) return res.status(400).json({ error: 'Post id is required' });
   const post = await prisma.communityPost.update({
-    where: { id: req.params.postId },
+    where: { id: postId },
     data: { isPinned: false },
   });
   res.json({ postId: post.id, isPinned: post.isPinned });

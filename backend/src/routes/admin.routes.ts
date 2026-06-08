@@ -31,6 +31,7 @@ router.get('/dashboard', authenticate, authorizeAdmin, dashboard.adminDashboard)
 
 // Shared client billing — same ClientService* records Super Admin manages
 router.get('/billing/subscription', authenticate, authorizeAdmin, getBusinessBillingOverview);
+router.get('/billing/summary', authenticate, authorizeAdmin, getBusinessBillingOverview);
 router.get('/billing/invoices', authenticate, authorizeAdmin, listBusinessInvoices);
 router.get('/billing/payments', authenticate, authorizeAdmin, listBusinessPayments);
 

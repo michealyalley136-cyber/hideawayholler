@@ -44,10 +44,29 @@ export async function submitCheckIn(req: AuthRequest, res: Response) {
   res.json({ checkIn });
 }
 
+export async function listPendingCheckIns(_req: AuthRequest, res: Response) {
+  const checkIns = await prisma.checkIn.findMany({
+    where: { adminApproved: false, completedAt: { not: null } },
+    include: {
+      user: { include: { profile: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
+  res.json({ checkIns });
+}
+
+function resolveCheckInId(req: AuthRequest) {
+  return (req.body?.checkInId as string) || req.params.id;
+}
+
 export async function approveCheckIn(req: AuthRequest, res: Response) {
+  const checkInId = resolveCheckInId(req);
+  if (!checkInId) return res.status(400).json({ error: 'Check-in id is required' });
+
   const { adminNotes } = req.body;
   const checkIn = await prisma.checkIn.update({
-    where: { id: req.params.id },
+    where: { id: checkInId },
     data: {
       adminApproved: true,
       adminApprovedAt: new Date(),
@@ -65,6 +84,22 @@ export async function approveCheckIn(req: AuthRequest, res: Response) {
       data: { status: 'CHECKED_IN' },
     });
   }
+
+  res.json({ checkIn });
+}
+
+export async function rejectCheckIn(req: AuthRequest, res: Response) {
+  const checkInId = resolveCheckInId(req);
+  if (!checkInId) return res.status(400).json({ error: 'Check-in id is required' });
+
+  const { adminNotes } = req.body;
+  const checkIn = await prisma.checkIn.update({
+    where: { id: checkInId },
+    data: {
+      adminApproved: false,
+      adminNotes: typeof adminNotes === 'string' ? adminNotes : 'Rejected by admin',
+    },
+  });
 
   res.json({ checkIn });
 }

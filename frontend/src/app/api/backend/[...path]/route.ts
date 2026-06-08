@@ -23,13 +23,22 @@ async function proxyBackendRequest(req: NextRequest, context: RouteContext) {
   }
 
   const { path = [] } = await context.params;
-  const targetUrl = new URL(`${apiOrigin}/api/${path.map(encodeURIComponent).join('/')}`);
+  const joinedPath = path.map(encodeURIComponent).join('/');
+
+  // Legacy SOS action URLs like /admin/sos/:id/acknowledge 404 on the backend Vercel
+  // deployment. Rewrite them to single-segment routes with sosAlertId in the body so
+  // cached older frontend bundles still work.
+  const legacySosAction = joinedPath.match(/^admin\/sos\/([^/]+)\/(acknowledge|resolve|mute)$/);
+  const targetPath = legacySosAction ? `admin/sos/${legacySosAction[2]}` : joinedPath;
+  const targetUrl = new URL(`${apiOrigin}/api/${targetPath}`);
   targetUrl.search = req.nextUrl.search;
 
   const headers = new Headers();
   copyHeader(req.headers, headers, 'accept');
   copyHeader(req.headers, headers, 'authorization');
-  copyHeader(req.headers, headers, 'content-type');
+  if (!headers.has('content-type')) {
+    headers.set('content-type', 'application/json');
+  }
 
   const init: RequestInit = {
     method: req.method,
@@ -38,7 +47,20 @@ async function proxyBackendRequest(req: NextRequest, context: RouteContext) {
   };
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    init.body = await req.arrayBuffer();
+    const rawBody = await req.arrayBuffer();
+    if (legacySosAction) {
+      let existing: Record<string, unknown> = {};
+      if (rawBody.byteLength > 0) {
+        try {
+          existing = JSON.parse(new TextDecoder().decode(rawBody)) as Record<string, unknown>;
+        } catch {
+          existing = {};
+        }
+      }
+      init.body = JSON.stringify({ ...existing, sosAlertId: legacySosAction[1] });
+    } else {
+      init.body = rawBody;
+    }
   }
 
   try {

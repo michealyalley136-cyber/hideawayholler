@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'hollerhub-static-v1';
+const CACHE_VERSION = 'hollerhub-static-v2';
 const STATIC_ASSETS = [
   '/offline',
   '/manifest.webmanifest',
@@ -30,14 +30,16 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/api') || url.pathname.startsWith('/uploads')) return;
 
+  // Never cache Next.js build chunks — they are content-hashed and stale SW caches
+  // caused SOS action buttons to keep calling old API routes after deploys.
+  if (url.pathname.startsWith('/_next/')) return;
+
   const isStaticAsset =
     url.pathname.startsWith('/icons/') ||
     url.pathname.startsWith('/images/') ||
     url.pathname === '/favicon.ico' ||
     url.pathname === '/manifest.webmanifest' ||
     request.destination === 'image' ||
-    request.destination === 'style' ||
-    request.destination === 'script' ||
     request.destination === 'font';
 
   if (isStaticAsset) {

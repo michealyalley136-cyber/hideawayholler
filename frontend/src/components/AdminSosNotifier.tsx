@@ -272,10 +272,10 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
     if (action === 'ACKNOWLEDGE') setAcknowledgeRequestStatus('Sending');
     if (action === 'RESOLVE') setResolveRequestStatus('Sending');
     try {
-      const endpoint = action === 'ACKNOWLEDGE' ? `/admin/sos/${alert.id}/acknowledge` : `/admin/sos/${alert.id}/resolve`;
+      const endpoint = action === 'ACKNOWLEDGE' ? '/admin/sos/acknowledge' : '/admin/sos/resolve';
       setLastActionEndpoint(endpoint);
       if (process.env.NODE_ENV !== 'production') console.debug('[sos admin] modal button clicked', { action, endpoint, alertId: alert.id });
-      const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; sos?: SosAlert; success?: boolean }>(endpoint, { method: 'POST' });
+      const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; sos?: SosAlert; success?: boolean }>(endpoint, { method: 'POST', body: { sosAlertId: alert.id } });
       const nextAlert = data.alert || data.sosAlert || data.sos;
       if (process.env.NODE_ENV !== 'production') console.debug('[sos admin] action response received', { action, endpoint, response: data });
       if (!nextAlert?.id) throw new Error('Backend did not return the updated SOS alert.');
@@ -309,7 +309,7 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
             : 'Failed to resolve SOS.';
       // Surface the real backend reason in production so the action is debuggable instead of a blind "Failed".
       const detailed = reason && !base.includes(reason) ? `${base} (${displayFetchError(reason)})` : base;
-      if (process.env.NODE_ENV !== 'production') console.error('[sos admin] action failed', { action, endpoint: `/admin/sos/${alert.id}/${action === 'ACKNOWLEDGE' ? 'acknowledge' : 'resolve'}`, reason, err });
+      if (process.env.NODE_ENV !== 'production') console.error('[sos admin] action failed', { action, endpoint: action === 'ACKNOWLEDGE' ? '/admin/sos/acknowledge' : '/admin/sos/resolve', alertId: alert.id, reason, err });
       setLastFetchError(reason);
       setActionStatus(detailed);
       setLastActionStatus('failed');

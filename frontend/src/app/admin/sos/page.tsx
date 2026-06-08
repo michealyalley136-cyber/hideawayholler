@@ -100,9 +100,10 @@ export default function AdminSosCenter() {
     setActionStatus(action === 'ACKNOWLEDGE' ? 'Acknowledging SOS...' : 'Resolving SOS...');
     try {
       const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; sos?: SosAlert; success?: boolean }>(
-        action === 'ACKNOWLEDGE' ? `/admin/sos/${alert.id}/acknowledge` : `/admin/sos/${alert.id}/resolve`,
+        action === 'ACKNOWLEDGE' ? '/admin/sos/acknowledge' : '/admin/sos/resolve',
         {
           method: 'POST',
+          body: { sosAlertId: alert.id },
         }
       );
       const nextAlert = data.alert || data.sosAlert || data.sos;

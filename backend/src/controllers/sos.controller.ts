@@ -788,7 +788,7 @@ export async function getSosAlert(req: AuthRequest, res: Response) {
 }
 
 export async function acknowledgeSosAlert(req: AuthRequest, res: Response) {
-  const sosAlertId = req.params.sosAlertId;
+  const sosAlertId = req.params.sosAlertId || (req.body as { sosAlertId?: string } | undefined)?.sosAlertId;
   if (!sosAlertId) {
     return res.status(400).json({ success: false, error: 'Missing SOS alert ID.' });
   }
@@ -810,13 +810,18 @@ export async function acknowledgeSosAlert(req: AuthRequest, res: Response) {
 }
 
 export async function resolveSosAlert(req: AuthRequest, res: Response) {
-  req.params.id = req.params.sosAlertId;
+  const sosAlertId = req.params.sosAlertId || (req.body as { sosAlertId?: string } | undefined)?.sosAlertId;
+  req.params.id = sosAlertId || '';
   req.body = { ...(req.body || {}), action: 'RESOLVE' };
   return adminSosAction(req, res);
 }
 
 export async function muteSosAlert(req: AuthRequest, res: Response) {
-  const alert = await prisma.sosAlert.findUnique({ where: { id: req.params.sosAlertId } });
+  const sosAlertId = req.params.sosAlertId || (req.body as { sosAlertId?: string } | undefined)?.sosAlertId;
+  if (!sosAlertId) {
+    return res.status(400).json({ success: false, error: 'Missing SOS alert ID.' });
+  }
+  const alert = await prisma.sosAlert.findUnique({ where: { id: sosAlertId } });
 
   if (!alert) {
     return res.status(404).json({ error: 'SOS alert not found' });

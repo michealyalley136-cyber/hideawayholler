@@ -7,7 +7,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/backend/dashboard/admin',
-        destination: '/api/backend/admin/dashboard',
+        destination: '/api/backend/admin-dashboard-stats',
+      },
+      {
+        source: '/api/backend/admin/dashboard',
+        destination: '/api/backend/admin-dashboard-stats',
       },
     ];
   },

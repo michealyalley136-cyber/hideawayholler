@@ -215,14 +215,18 @@ export interface SosEventLog {
 export interface SosAlert {
   id: string;
   residentId: string;
+  businessId?: string | null;
+  emergencyType?: string;
+  message?: string | null;
+  isTest?: boolean;
   residentName: string;
   assignment?: string;
   phone?: string;
   status: SosAlertStatus;
-  initialLatitude: number;
-  initialLongitude: number;
-  currentLatitude?: number;
-  currentLongitude?: number;
+  initialLatitude?: number | null;
+  initialLongitude?: number | null;
+  currentLatitude?: number | null;
+  currentLongitude?: number | null;
   accuracy?: number;
   streetAddress?: string;
   landmark?: string;

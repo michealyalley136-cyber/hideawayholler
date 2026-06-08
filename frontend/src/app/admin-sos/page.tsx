@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Bell, BellOff, CheckCircle2, Clock, MapPin, Phone, ShieldAlert, Volume2, VolumeX } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, MapPin, Phone, ShieldAlert, Volume2, VolumeX } from 'lucide-react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,8 @@ import { SosAlert, SosAlertStatus } from '@/lib/types';
 const ACTIVE_STATUSES: SosAlertStatus[] = ['ACTIVE', 'ACKNOWLEDGED', 'NEEDS_HELP'];
 const UNACKNOWLEDGED_STATUSES: SosAlertStatus[] = ['ACTIVE', 'NEEDS_HELP'];
 const SOS_SOUND_ENABLED_KEY = 'sosSoundEnabled';
+const SOS_POLL_INTERVAL_MS = 2000;
+const MOBILE_PUSH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOBILE_SOS_PUSH === 'true';
 
 type AdminDevice = {
   id: string;
@@ -41,13 +43,26 @@ function formatDate(value?: string) {
 function mapUrl(alert: SosAlert) {
   const latitude = alert.currentLatitude ?? alert.initialLatitude;
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
+  if (latitude == null || longitude == null) return null;
   return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 }
 
 function coords(alert: SosAlert) {
   const latitude = alert.currentLatitude ?? alert.initialLatitude;
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
+  if (latitude == null || longitude == null) return 'Location unavailable';
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+function isMobileDevice() {
+  if (typeof window === 'undefined') return false;
+
+  const userAgent = navigator.userAgent || '';
+  const mobileUa = /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(userAgent);
+  const smallScreen = window.matchMedia('(max-width: 768px)').matches;
+  const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+
+  return mobileUa || (smallScreen && coarsePointer);
 }
 
 function statusClass(status: SosAlertStatus) {
@@ -89,6 +104,7 @@ function AdminSosConsole() {
   const [settings, setSettings] = useState<SosSettings>(DEFAULT_SOS_SETTINGS);
   const [device, setDevice] = useState<AdminDevice | null>(null);
   const [pushStatus, setPushStatus] = useState('Push notifications are not enabled on this device.');
+  const [mobileDevice, setMobileDevice] = useState(false);
   const seenUnacknowledgedIdsRef = useRef<Set<string>>(new Set());
   const deepLinkedAlertIdRef = useRef<string | null>(null);
 
@@ -114,6 +130,10 @@ function AdminSosConsole() {
   }, []);
 
   const loadDevices = useCallback(async () => {
+    if (!MOBILE_PUSH_ENABLED) {
+      setPushStatus('Mobile SOS notifications are planned for a future upgrade. Use the computer dashboard for SOS sound alerts.');
+      return;
+    }
     try {
       const res = await api<DevicesResponse>('/admin-devices', { suppressErrorLog: true });
       setDevice(res.devices[0] || null);
@@ -137,10 +157,19 @@ function AdminSosConsole() {
 
   useEffect(() => {
     loadAlerts();
-    loadDevices();
+    if (MOBILE_PUSH_ENABLED) loadDevices();
     loadSettings();
-    const timer = setInterval(loadAlerts, 5000);
-    return () => clearInterval(timer);
+    const timer = setInterval(loadAlerts, SOS_POLL_INTERVAL_MS);
+
+    const refreshNow = () => loadAlerts();
+    window.addEventListener('focus', refreshNow);
+    document.addEventListener('visibilitychange', refreshNow);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refreshNow);
+      document.removeEventListener('visibilitychange', refreshNow);
+    };
   }, [loadAlerts, loadDevices, loadSettings]);
 
   useEffect(() => {
@@ -156,7 +185,7 @@ function AdminSosConsole() {
     const hasNewAlert = sirenAlerts.some((alert) => !seenUnacknowledgedIdsRef.current.has(alert.id));
     seenUnacknowledgedIdsRef.current = currentIds;
 
-    if (soundEnabled && sirenAlerts.length > 0) {
+    if (!mobileDevice && soundEnabled && sirenAlerts.length > 0) {
       void playSosSound({ loop: settings.continuousAlarmEnabled }).then((played) => {
         if (!played) {
           setSoundBlocked(true);
@@ -172,9 +201,13 @@ function AdminSosConsole() {
     if (sirenAlerts.length === 0) {
       stopSosSound();
     }
-  }, [settings.continuousAlarmEnabled, sirenAlerts, soundEnabled]);
+  }, [mobileDevice, settings.continuousAlarmEnabled, sirenAlerts, soundEnabled]);
 
   const enableSound = async () => {
+    if (mobileDevice) {
+      setSoundStatus('Mobile SOS notifications are planned for a future upgrade. Use the computer dashboard for SOS sound alerts.');
+      return;
+    }
     const unlocked = await unlockSosSound();
     if (unlocked) {
       setSoundBlocked(false);
@@ -197,6 +230,10 @@ function AdminSosConsole() {
   };
 
   const testSiren = async () => {
+    if (mobileDevice) {
+      setSoundStatus('Mobile SOS notifications are planned for a future upgrade. Use the computer dashboard for SOS sound alerts.');
+      return;
+    }
     setSosSoundSource(settings.sound.url);
     const played = await playSosSound({ loop: false });
     if (!played) {
@@ -220,6 +257,7 @@ function AdminSosConsole() {
   };
 
   useEffect(() => {
+    setMobileDevice(isMobileDevice());
     if (typeof window !== 'undefined' && localStorage.getItem(SOS_SOUND_ENABLED_KEY) === 'true') {
       setSoundEnabled(true);
       setSoundStatus('Sound armed on this device');
@@ -231,6 +269,10 @@ function AdminSosConsole() {
   }, []);
 
   const enablePush = async () => {
+    if (!MOBILE_PUSH_ENABLED) {
+      setPushStatus('Mobile SOS notifications are planned for a future upgrade. Use the computer dashboard for SOS sound alerts.');
+      return;
+    }
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       setPushStatus('This browser does not support installable push notifications.');
       return;
@@ -270,6 +312,7 @@ function AdminSosConsole() {
   };
 
   const setDeviceEnabled = async (enabled: boolean) => {
+    if (!MOBILE_PUSH_ENABLED) return;
     if (!device) return;
     const res = await api<DeviceResponse>('/admin-devices', {
       method: 'PATCH',
@@ -282,7 +325,7 @@ function AdminSosConsole() {
   const selectAlert = useCallback(async (alert: SosAlert) => {
     setSelectedAlertId(alert.id);
     const shouldPlay = UNACKNOWLEDGED_STATUSES.includes(alert.status) && !alert.adminAcknowledgedAt;
-    if (!shouldPlay) return;
+    if (!shouldPlay || mobileDevice) return;
 
     const played = await playSosSound({ loop: settings.continuousAlarmEnabled });
     if (!played) {
@@ -294,7 +337,7 @@ function AdminSosConsole() {
         setSoundStatus('Siren is playing for the selected alert. Click Enable Emergency Sound to arm automatic playback.');
       }
     }
-  }, [settings.continuousAlarmEnabled, soundEnabled]);
+  }, [mobileDevice, settings.continuousAlarmEnabled, soundEnabled]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -348,26 +391,33 @@ function AdminSosConsole() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant={soundEnabled ? 'secondary' : 'danger'} onClick={soundEnabled ? disableSound : enableSound}>
-                {soundEnabled ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                {soundEnabled ? 'Mute Sound' : 'Enable Emergency Sound'}
-              </Button>
-              <Button variant="secondary" onClick={testSiren}>
-                <Volume2 className="h-4 w-4" />
-                Test Siren
-              </Button>
-              <Button variant={device?.enabled ? 'secondary' : 'danger'} onClick={device?.enabled ? () => setDeviceEnabled(false) : enablePush}>
-                {device?.enabled ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-                {device?.enabled ? 'Disable Push' : 'Enable Push'}
-              </Button>
+              {!mobileDevice && (
+                <>
+                  <Button variant={soundEnabled ? 'secondary' : 'danger'} onClick={soundEnabled ? disableSound : enableSound}>
+                    {soundEnabled ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    {soundEnabled ? 'Mute Sound' : 'Enable Emergency Sound'}
+                  </Button>
+                  <Button variant="secondary" onClick={testSiren}>
+                    <Volume2 className="h-4 w-4" />
+                    Test Siren
+                  </Button>
+                </>
+              )}
+              {MOBILE_PUSH_ENABLED && (
+                <Button variant={device?.enabled ? 'secondary' : 'danger'} onClick={device?.enabled ? () => setDeviceEnabled(false) : enablePush}>
+                  {device?.enabled ? 'Disable Push' : 'Enable Push'}
+                </Button>
+              )}
             </div>
           </div>
           <div className="mt-4 grid gap-2 text-sm text-red-100 md:grid-cols-2">
-            <p>{pushStatus}</p>
+            {MOBILE_PUSH_ENABLED && <p>{pushStatus}</p>}
             <p>{soundBlocked ? soundStatus : soundEnabled ? `Sound armed on this device: ${settings.sound.label}` : soundStatus}</p>
           </div>
           <div className="mt-4 rounded-md border border-red-400/40 bg-red-900/40 p-3 text-sm font-semibold text-red-50">
-            For emergency sound to work, keep this SOS app installed/opened recently, enable notifications, turn device volume up, and disable silent/focus mode during coverage hours.
+            {mobileDevice
+              ? 'Mobile SOS notifications are planned for a future upgrade. For now, keep the admin dashboard open on a computer to receive SOS sound alerts.'
+              : 'For emergency sound to work, keep this computer dashboard open, enable emergency sound, and keep device volume up during coverage hours.'}
           </div>
         </header>
 
@@ -391,7 +441,7 @@ function AdminSosConsole() {
               <CheckCircle2 className="h-6 w-6 text-emerald-300" />
               <div>
                 <p className="font-bold text-white">No active SOS alerts</p>
-                <p className="text-sm text-emerald-100">This console polls every 5 seconds while you are signed in.</p>
+                <p className="text-sm text-emerald-100">This console updates every 2 seconds while you are signed in.</p>
               </div>
             </div>
           </section>
@@ -400,6 +450,7 @@ function AdminSosConsole() {
             {alerts.map((alert) => {
               const isActive = ACTIVE_STATUSES.includes(alert.status);
               const actionLoading = (action: string) => actionId === `${alert.id}:${action}`;
+              const alertMapUrl = mapUrl(alert);
 
               return (
                 <article
@@ -471,7 +522,7 @@ function AdminSosConsole() {
                       <Phone className="h-4 w-4" />
                       Call 911
                     </a>
-                    <a href={mapUrl(alert)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                    <a href={alertMapUrl || undefined} aria-disabled={!alertMapUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 aria-disabled:pointer-events-none aria-disabled:opacity-50">
                       <MapPin className="h-4 w-4" />
                       Map
                     </a>

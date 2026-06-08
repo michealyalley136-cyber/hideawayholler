@@ -49,6 +49,15 @@ function configureWebPush() {
   return push;
 }
 
+export function getPushConfigurationStatus() {
+  return {
+    webPushAvailable: Boolean(getWebPush()),
+    vapidPublicKeyConfigured: Boolean(process.env.VAPID_PUBLIC_KEY),
+    vapidPrivateKeyConfigured: Boolean(process.env.VAPID_PRIVATE_KEY),
+    configured: Boolean(getWebPush() && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+  };
+}
+
 async function getOrCreateEmergencyAlert(sosAlertId: string) {
   return prisma.emergencyAlert.upsert({
     where: { sosAlertId },
@@ -90,8 +99,12 @@ export async function sendSosPushNotifications(alert: Pick<SosAlert, 'id'>) {
   }
 
   const emergencyAlert = await getOrCreateEmergencyAlert(alert.id);
-  const devices = await prisma.adminDevice.findMany({
-    where: { enabled: true },
+  const fullAlert = await prisma.sosAlert.findUnique({ where: { id: alert.id } });
+  const devices = await prisma.adminPushSubscription.findMany({
+    where: {
+      isActive: true,
+      ...(fullAlert?.businessId ? { businessId: fullAlert.businessId } : {}),
+    },
     orderBy: { lastSeenAt: 'desc' },
   });
 
@@ -120,16 +133,26 @@ export async function sendSosPushNotifications(alert: Pick<SosAlert, 'id'>) {
     return;
   }
 
+  const location = fullAlert?.streetAddress || fullAlert?.landmark || fullAlert?.assignment || 'Location unavailable';
+  const emergencyType = fullAlert?.emergencyType || 'SOS';
+  const body = fullAlert ? `${fullAlert.residentName} needs help. ${location}.` : SOS_PUSH_BODY;
   const payload = JSON.stringify({
     title: SOS_PUSH_TITLE,
-    body: SOS_PUSH_BODY,
-    url: `/admin-sos?alertId=${alert.id}`,
+    body,
+    url: `/admin/sos?alertId=${alert.id}`,
     alertId: alert.id,
+    residentName: fullAlert?.residentName,
+    emergencyType,
+    location,
+    businessId: fullAlert?.businessId,
+    createdAt: fullAlert?.createdAt,
+    isTest: fullAlert?.isTest || false,
   });
 
   await Promise.all(
     devices.map(async (device) => {
       try {
+        const adminDevice = await prisma.adminDevice.findUnique({ where: { endpoint: device.endpoint } });
         await push.sendNotification(
           {
             endpoint: device.endpoint,
@@ -140,7 +163,7 @@ export async function sendSosPushNotifications(alert: Pick<SosAlert, 'id'>) {
         await logNotification({
           emergencyAlertId: emergencyAlert.id,
           sosAlertId: alert.id,
-          adminDeviceId: device.id,
+          adminDeviceId: adminDevice?.id,
           channel: 'PUSH',
           status: 'SENT',
         });
@@ -149,7 +172,7 @@ export async function sendSosPushNotifications(alert: Pick<SosAlert, 'id'>) {
         await logNotification({
           emergencyAlertId: emergencyAlert.id,
           sosAlertId: alert.id,
-          adminDeviceId: device.id,
+          adminDeviceId: (await prisma.adminDevice.findUnique({ where: { endpoint: device.endpoint } }))?.id,
           channel: 'PUSH',
           status: 'FAILED',
           message,

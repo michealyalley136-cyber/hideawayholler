@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { CheckCircle2, Phone, ShieldAlert } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '@/components/ui/Button';
@@ -12,23 +13,35 @@ const HOLD_MS = 3000;
 const ACK_TRACKING_DELAY_MS = 45000;
 const ACTIVE_TRACKING_DELAY_MS = 60000;
 const LOCATION_UPDATE_MS = 12000;
+const LOCATION_TIMEOUT_MS = 5000;
 
 function isActiveSos(alert?: SosAlert | null): alert is SosAlert {
   return !!alert && ['ACTIVE', 'ACKNOWLEDGED', 'NEEDS_HELP'].includes(alert.status);
 }
 
 function getCurrentLocation() {
-  return new Promise<GeolocationPosition>((resolve, reject) => {
+  return new Promise<GeolocationPosition | null>((resolve) => {
     if (!navigator.geolocation) {
-      reject(new Error('Location sharing is not supported by this browser.'));
+      resolve(null);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
-    });
+    const timeout = window.setTimeout(() => resolve(null), LOCATION_TIMEOUT_MS);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        window.clearTimeout(timeout);
+        resolve(position);
+      },
+      () => {
+        window.clearTimeout(timeout);
+        resolve(null);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: LOCATION_TIMEOUT_MS,
+        maximumAge: 0,
+      }
+    );
   });
 }
 
@@ -42,6 +55,7 @@ export function ResidentSosPanel() {
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const trackingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const alertRef = useRef<SosAlert | null>(null);
+  const triggeredRef = useRef(false);
 
   useEffect(() => {
     alertRef.current = alert;
@@ -52,9 +66,13 @@ export function ResidentSosPanel() {
     if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     holdTimerRef.current = null;
     progressTimerRef.current = null;
+    if (isHolding && !triggeredRef.current) {
+      console.info('[sos resident] SOS hold canceled');
+      setMessage('SOS canceled. Hold for 3 seconds to send.');
+    }
     setIsHolding(false);
     setHoldProgress(0);
-  }, []);
+  }, [isHolding]);
 
   const refreshActiveAlert = useCallback(async () => {
     try {
@@ -93,6 +111,7 @@ export function ResidentSosPanel() {
     if (!currentAlert || !isActiveSos(currentAlert)) return;
     try {
       const position = await getCurrentLocation();
+      if (!position) return;
       const data = await api<{ alert: SosAlert }>(`/sos/${currentAlert.id}/location`, {
         method: 'POST',
         suppressErrorLog: true,
@@ -134,43 +153,53 @@ export function ResidentSosPanel() {
 
   const triggerSos = useCallback(async () => {
     console.info('[sos resident] SOS hold completed');
-    stopHold();
+    triggeredRef.current = true;
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    holdTimerRef.current = null;
+    progressTimerRef.current = null;
+    setIsHolding(false);
+    setHoldProgress(100);
     setIsSending(true);
-    setMessage('Requesting your current location...');
+    setMessage('SOS trigger started. Sending SOS alert...');
 
     try {
       const position = await getCurrentLocation();
-      console.info('[sos resident] GPS received', {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-      });
-      console.info('[sos resident] SOS API request sent');
-      const data = await api<{ alert: SosAlert; message?: string }>('/sos', {
+      const payload = {
+        latitude: position?.coords.latitude ?? null,
+        longitude: position?.coords.longitude ?? null,
+        accuracy: position?.coords.accuracy ?? null,
+        speed: position?.coords.speed ?? null,
+        heading: position?.coords.heading ?? null,
+        emergencyType: 'SOS',
+        message: position ? 'Resident triggered SOS from portal.' : 'Resident triggered SOS from portal. Location unavailable.',
+        streetAddress: position ? undefined : 'Location unavailable',
+      };
+      console.info('[sos resident] SOS API request sent', payload);
+      const data = await api<{ success?: boolean; alert?: SosAlert; sosAlert?: SosAlert; message?: string }>('/sos/trigger', {
         method: 'POST',
-        body: {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          speed: position.coords.speed,
-          heading: position.coords.heading,
-        },
+        body: payload,
       });
-      setAlert(data.alert);
-      console.info('[sos resident] SOS record created successfully', { sosAlertId: data.alert.id });
-      setMessage(data.message || 'SOS alert sent. Admin has been notified. Your current location has been shared.');
+      const nextAlert = data.alert || data.sosAlert || null;
+      if (nextAlert && 'residentId' in nextAlert) setAlert(nextAlert);
+      console.info('[sos resident] SOS backend response', data);
+      setMessage(data.message || 'SOS sent successfully. Admin has been notified.');
     } catch (err) {
       console.error('[sos] Failed to trigger SOS', err);
-      setMessage('Could not send SOS because location was unavailable. Please call 911 if this is an emergency.');
+      setMessage(`SOS failed: ${err instanceof ApiError ? err.message : 'Unable to send alert. Please call 911 if this is an emergency.'}`);
     } finally {
       setIsSending(false);
+      triggeredRef.current = false;
     }
-  }, [stopHold]);
+  }, []);
 
-  const startHold = useCallback(() => {
+  const startHold = useCallback((event?: { preventDefault?: () => void }) => {
+    event?.preventDefault?.();
     if (isSending || isActiveSos(alert)) return;
+    console.info('[sos resident] SOS hold started');
+    triggeredRef.current = false;
     stopHold();
-    setMessage('Keep holding to send SOS.');
+    setMessage('Hold to trigger SOS...');
     setIsHolding(true);
     const startedAt = Date.now();
 
@@ -180,6 +209,11 @@ export function ResidentSosPanel() {
 
     holdTimerRef.current = setTimeout(triggerSos, HOLD_MS);
   }, [alert, isSending, stopHold, triggerSos]);
+
+  const cancelHold = useCallback((event?: { preventDefault?: () => void }) => {
+    event?.preventDefault?.();
+    stopHold();
+  }, [stopHold]);
 
   const residentAction = async (action: 'SAFE' | 'NEEDS_HELP' | 'KEEP_ACTIVE') => {
     if (!alert) return;
@@ -262,12 +296,23 @@ export function ResidentSosPanel() {
         <button
           type="button"
           onPointerDown={startHold}
-          onPointerUp={stopHold}
-          onPointerCancel={stopHold}
-          onPointerLeave={stopHold}
+          onPointerUp={cancelHold}
+          onPointerCancel={cancelHold}
+          onPointerLeave={cancelHold}
+          onTouchStart={startHold}
+          onTouchEnd={cancelHold}
+          onMouseDown={startHold}
+          onMouseUp={cancelHold}
+          onContextMenu={(event) => event.preventDefault()}
           disabled={isSending}
+          style={{
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTouchCallout: 'none',
+          } as CSSProperties}
           className={clsx(
-            'relative flex h-56 w-56 flex-col items-center justify-center overflow-hidden rounded-full border-4 border-red-950/30 bg-red-700 px-8 text-center text-white shadow-xl shadow-red-950/25 transition-colors focus:outline-none focus:ring-4 focus:ring-red-300 focus:ring-offset-4 disabled:opacity-60 sm:h-72 sm:w-72',
+            'relative flex h-56 w-56 touch-none select-none flex-col items-center justify-center overflow-hidden rounded-full border-4 border-red-950/30 bg-red-700 px-8 text-center text-white shadow-xl shadow-red-950/25 transition-colors focus:outline-none focus:ring-4 focus:ring-red-300 focus:ring-offset-4 disabled:opacity-60 sm:h-72 sm:w-72',
             isHolding ? 'bg-red-900' : 'hover:bg-red-800'
           )}
         >
@@ -277,6 +322,7 @@ export function ResidentSosPanel() {
             {isSending ? 'Sending SOS...' : 'Hold to Send SOS'}
           </span>
           <span className="relative z-10 mt-2 text-sm font-semibold text-red-50 sm:text-base">Emergency use only</span>
+          {isHolding && <span className="relative z-10 mt-2 text-xs font-bold text-white">{Math.ceil((HOLD_MS * (1 - holdProgress / 100)) / 1000)}s</span>}
         </button>
       </div>
 

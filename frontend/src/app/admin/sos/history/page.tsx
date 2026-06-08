@@ -22,7 +22,15 @@ function locationLabel(alert: SosAlert) {
   if (alert.streetAddress) return alert.streetAddress;
   const latitude = alert.currentLatitude ?? alert.initialLatitude;
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
+  if (latitude == null || longitude == null) return 'Location unavailable';
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+function mapUrl(alert: SosAlert) {
+  const latitude = alert.currentLatitude ?? alert.initialLatitude;
+  const longitude = alert.currentLongitude ?? alert.initialLongitude;
+  if (latitude == null || longitude == null) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 }
 
 export default function SosHistoryPage() {
@@ -64,7 +72,9 @@ export default function SosHistoryPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {alerts.map((alert) => (
+              {alerts.map((alert) => {
+                const alertMapUrl = mapUrl(alert);
+                return (
                 <Card key={alert.id}>
                   <CardHeader>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -103,10 +113,11 @@ export default function SosHistoryPage() {
                         View Details
                       </Link>
                       <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${alert.currentLatitude ?? alert.initialLatitude},${alert.currentLongitude ?? alert.initialLongitude}`}
+                        href={alertMapUrl || undefined}
+                        aria-disabled={!alertMapUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 aria-disabled:pointer-events-none aria-disabled:opacity-50"
                       >
                         <MapPin className="h-4 w-4" />
                         View Location
@@ -114,7 +125,8 @@ export default function SosHistoryPage() {
                     </div>
                   </CardBody>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

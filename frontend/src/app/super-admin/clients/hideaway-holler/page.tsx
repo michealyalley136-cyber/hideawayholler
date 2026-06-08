@@ -492,6 +492,21 @@ export default function HideawayHollerClientPage() {
 
           <div className="space-y-4">
             <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold text-slate-900">SOS Records & Emergency Logs</h2>
+                <p className="text-sm text-slate-500">Super Admin access is for account oversight and reporting. Active SOS response, sirens, and alert controls belong to Hideaway Holler admins.</p>
+              </CardHeader>
+              <CardBody>
+                <div className="space-y-3 text-sm text-slate-600">
+                  <p>Use the read-only SOS records page to review emergency activity, response status, and history across managed businesses.</p>
+                  <a href="/super-admin/sos-logs" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                    View SOS Records
+                  </a>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card>
               <CardHeader><h2 className="text-lg font-semibold text-slate-900">Account Health</h2></CardHeader>
               <CardBody>
                 <Badge className={`${statusStyles[healthKey || ''] || 'bg-slate-200 text-slate-700'}`}>{data?.accountHealth.status || 'Loading'}</Badge>

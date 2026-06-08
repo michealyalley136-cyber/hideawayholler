@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
+import { getDefaultBusinessAccount } from '../services/businessBilling.service';
 
 type PushSubscriptionBody = {
   endpoint?: string;
@@ -25,6 +26,14 @@ function userAgent(req: AuthRequest) {
   return typeof value === 'string' ? value : undefined;
 }
 
+function deviceTypeFromUserAgent(value?: string) {
+  if (!value) return 'unknown';
+  if (/iPhone|iPad|iPod/i.test(value)) return 'ios';
+  if (/Android/i.test(value)) return 'android';
+  if (/Mobile/i.test(value)) return 'mobile';
+  return 'desktop';
+}
+
 export async function listAdminDevices(req: AuthRequest, res: Response) {
   const devices = await prisma.adminDevice.findMany({
     where: { adminId: req.user!.userId },
@@ -40,31 +49,75 @@ export async function registerAdminDevice(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: 'Valid push subscription endpoint and keys are required' });
   }
 
-  const body = req.body as { deviceLabel?: unknown; enabled?: unknown };
-  const device = await prisma.adminDevice.upsert({
-    where: { endpoint: subscription.endpoint },
-    create: {
-      adminId: req.user!.userId,
-      endpoint: subscription.endpoint,
-      p256dh: subscription.p256dh,
-      auth: subscription.auth,
-      userAgent: userAgent(req),
-      deviceLabel: typeof body.deviceLabel === 'string' ? body.deviceLabel : 'Admin SOS device',
-      enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
-      lastSeenAt: new Date(),
-    },
-    update: {
-      adminId: req.user!.userId,
-      p256dh: subscription.p256dh,
-      auth: subscription.auth,
-      userAgent: userAgent(req),
-      deviceLabel: typeof body.deviceLabel === 'string' ? body.deviceLabel : undefined,
-      enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
-      lastSeenAt: new Date(),
+  const body = req.body as { deviceLabel?: unknown; enabled?: unknown; deviceType?: unknown; userAgent?: unknown };
+  const now = new Date();
+  const agent = typeof body.userAgent === 'string' ? body.userAgent : userAgent(req);
+  const business = await getDefaultBusinessAccount();
+  const enabled = typeof body.enabled === 'boolean' ? body.enabled : true;
+  const deviceLabel = typeof body.deviceLabel === 'string' ? body.deviceLabel : 'Admin SOS device';
+  const deviceType = typeof body.deviceType === 'string' ? body.deviceType : deviceTypeFromUserAgent(agent);
+
+  const [device, pushSubscription] = await prisma.$transaction([
+    prisma.adminDevice.upsert({
+      where: { endpoint: subscription.endpoint },
+      create: {
+        adminId: req.user!.userId,
+        endpoint: subscription.endpoint,
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+        userAgent: agent,
+        deviceLabel,
+        enabled,
+        lastSeenAt: now,
+      },
+      update: {
+        adminId: req.user!.userId,
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+        userAgent: agent,
+        deviceLabel,
+        enabled,
+        lastSeenAt: now,
+      },
+    }),
+    prisma.adminPushSubscription.upsert({
+      where: { endpoint: subscription.endpoint },
+      create: {
+        adminId: req.user!.userId,
+        businessId: business.id,
+        endpoint: subscription.endpoint,
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+        userAgent: agent,
+        deviceType,
+        isActive: enabled,
+        lastSeenAt: now,
+      },
+      update: {
+        adminId: req.user!.userId,
+        businessId: business.id,
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+        userAgent: agent,
+        deviceType,
+        isActive: enabled,
+        lastSeenAt: now,
+      },
+    }),
+  ]);
+
+  res.status(201).json({
+    success: true,
+    registered: true,
+    device,
+    pushSubscription: {
+      id: pushSubscription.id,
+      endpoint: pushSubscription.endpoint,
+      isActive: pushSubscription.isActive,
+      deviceType: pushSubscription.deviceType,
+      lastSeenAt: pushSubscription.lastSeenAt,
     },
   });
-
-  res.status(201).json({ device });
 }
 
 export async function updateAdminDevice(req: AuthRequest, res: Response) {

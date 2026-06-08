@@ -377,6 +377,7 @@ model User {
   communityAlbumsCreated CommunityAlbum[]
   communityAlbumUploads CommunityAlbumImage[]
   adminDevices AdminDevice[]
+  adminPushSubscriptions AdminPushSubscription[]
   auditLogs AuditLog[]
 }
 
@@ -658,9 +659,11 @@ model BusinessAccount {
   billingSettings ClientBillingSettings?
   businessPlan    BusinessPlan?
   healthLogs      ClientAccountHealthLog[]
+  sosAlerts       SosAlert[]
   serviceSubscription ClientServiceSubscription?
   serviceInvoices     ClientServiceInvoice[]
   clientPayments      ClientPayment[]
+  adminPushSubscriptions AdminPushSubscription[]
 
   @@map("business_accounts")
 }
@@ -950,12 +953,16 @@ model ResidentReview {
 model SosAlert {
   id                   String         @id @default(uuid())
   residentId           String
+  businessId           String?
+  emergencyType        String         @default("SOS")
+  message              String?
+  isTest               Boolean        @default(false)
   residentName         String
   assignment           String?
   phone                String?
   status               SosAlertStatus @default(ACTIVE)
-  initialLatitude      Float
-  initialLongitude     Float
+  initialLatitude      Float?
+  initialLongitude     Float?
   currentLatitude      Float?
   currentLongitude     Float?
   accuracy             Float?
@@ -974,12 +981,14 @@ model SosAlert {
   updatedAt            DateTime       @updatedAt
 
   resident        User                 @relation(fields: [residentId], references: [id], onDelete: Cascade)
+  business        BusinessAccount?     @relation(fields: [businessId], references: [id], onDelete: SetNull)
   locationHistory SosLocationHistory[]
   eventLogs       SosEventLog[]
   emergencyAlert  EmergencyAlert?
   notificationLogs EmergencyNotificationLog[]
 
   @@index([residentId, status])
+  @@index([businessId, status])
   @@index([status, createdAt])
   @@map("sos_alerts")
 }
@@ -1040,6 +1049,28 @@ model AdminDevice {
 
   @@index([adminId, enabled])
   @@map("admin_devices")
+}
+
+model AdminPushSubscription {
+  id         String   @id @default(cuid())
+  adminId    String
+  businessId String
+  endpoint   String   @unique
+  p256dh      String
+  auth       String
+  userAgent  String?
+  deviceType String?
+  isActive   Boolean  @default(true)
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  admin    User            @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  business BusinessAccount @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, isActive])
+  @@index([businessId, isActive])
+  @@map("admin_push_subscriptions")
 }
 
 model EmergencyAlert {

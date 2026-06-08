@@ -15,3 +15,6 @@ frontend/npm-next-install-log.txt
 notifications/
 skills-lock.json
 LOCAL_URLS_AND_LOGINS.txt
+
+.vercel
+.env*.local

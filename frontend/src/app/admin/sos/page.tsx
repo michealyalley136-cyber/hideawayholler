@@ -32,7 +32,16 @@ function formatDate(value?: string) {
 function mapUrl(alert: SosAlert) {
   const latitude = alert.currentLatitude ?? alert.initialLatitude;
   const longitude = alert.currentLongitude ?? alert.initialLongitude;
+  if (latitude == null || longitude == null) return null;
   return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+}
+
+function locationLabel(alert: SosAlert) {
+  if (alert.streetAddress) return alert.streetAddress;
+  const latitude = alert.currentLatitude ?? alert.initialLatitude;
+  const longitude = alert.currentLongitude ?? alert.initialLongitude;
+  if (latitude == null || longitude == null) return 'Location unavailable';
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 }
 
 export default function AdminSosCenter() {
@@ -138,7 +147,8 @@ export default function AdminSosCenter() {
             <div className="space-y-4">
               {alerts.map((alert) => {
                 const isActive = ACTIVE_STATUSES.includes(alert.status);
-                const coords = `${(alert.currentLatitude ?? alert.initialLatitude).toFixed(6)}, ${(alert.currentLongitude ?? alert.initialLongitude).toFixed(6)}`;
+                const coords = locationLabel(alert);
+                const alertMapUrl = mapUrl(alert);
                 const actionLoading = (action: string) => actionId === `${alert.id}:${action}`;
 
                 return (
@@ -205,7 +215,7 @@ export default function AdminSosCenter() {
                           <Phone className="h-4 w-4" />
                           Call 911 Manually
                         </a>
-                        <a href={mapUrl(alert)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                        <a href={alertMapUrl || undefined} aria-disabled={!alertMapUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 aria-disabled:pointer-events-none aria-disabled:opacity-50">
                           <MapPin className="h-4 w-4" />
                           Map Pin
                         </a>

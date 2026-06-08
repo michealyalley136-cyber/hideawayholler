@@ -68,10 +68,21 @@ self.addEventListener('push', (event) => {
     data = {};
   }
 
-  const title = data.title || 'Emergency SOS Alert';
-  const body = data.body || 'A resident emergency alert has been triggered. Open the SOS console.';
+  const title = data.isTest ? 'TEST Emergency SOS Alert' : (data.title || 'Emergency SOS Alert');
+  const bodyPrefix = data.isTest ? '[TEST] ' : '';
+  const body = bodyPrefix + (data.body || 'A resident emergency alert has been triggered. Open the SOS console.');
   const alertId = data.alertId || data.id;
-  const url = data.url || (alertId ? `/admin-sos?alertId=${encodeURIComponent(alertId)}` : '/admin-sos');
+  const url = data.url || (alertId ? `/admin/sos?alertId=${encodeURIComponent(alertId)}` : '/admin/sos');
+  const notificationData = {
+    url,
+    alertId,
+    residentName: data.residentName,
+    emergencyType: data.emergencyType || 'SOS',
+    location: data.location || data.address,
+    businessId: data.businessId,
+    createdAt: data.createdAt,
+    isTest: Boolean(data.isTest)
+  };
 
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -83,19 +94,19 @@ self.addEventListener('push', (event) => {
       renotify: true,
       requireInteraction: true,
       vibrate: [900, 250, 900, 250, 900],
-      data: { url },
+      data: notificationData,
     })
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/admin-sos';
+  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/admin/sos';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if ('focus' in client && client.url.includes('/admin-sos')) {
+        if ('focus' in client && (client.url.includes('/admin/sos') || client.url.includes('/admin/dashboard'))) {
           return client.focus();
         }
       }

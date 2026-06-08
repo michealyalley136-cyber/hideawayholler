@@ -74,6 +74,7 @@ const adminNav = [
 
 const superAdminNav = [
   { href: '/super-admin/clients/hideaway-holler', label: 'Hideaway Holler', icon: Building2, exact: true },
+  { href: '/super-admin/sos-logs', label: 'SOS Records', icon: ShieldAlert },
 ];
 
 const alumniNav = [

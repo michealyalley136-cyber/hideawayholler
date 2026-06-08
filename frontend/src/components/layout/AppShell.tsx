@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X, LogOut, CloudSun, Bell, Wifi, AlertTriangle, Wrench } from 'lucide-react';
 import { Sidebar } from './Sidebar';
-import { AdminSosNotifier } from '../AdminSosNotifier';
+import { AdminSosAlertManager } from '../AdminSosNotifier';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '../ui/Button';
 
@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LogOut className="h-4 w-4" />
           </button>
         </header>
-        {user.role === 'ADMIN' && <AdminSosNotifier onCountChange={setActiveSosCount} />}
+        {user.role === 'ADMIN' && <AdminSosAlertManager role={user.role} onCountChange={setActiveSosCount} />}
         <div className="mx-auto w-full max-w-6xl min-w-0 p-3 pb-24 sm:p-4 sm:pb-24 lg:p-8">{children}</div>
         {isResidentPortalRole && (
           <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">

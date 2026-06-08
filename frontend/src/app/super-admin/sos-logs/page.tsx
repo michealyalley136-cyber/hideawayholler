@@ -6,7 +6,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { SosAlert, SosAlertStatus } from '@/lib/types';
 
 const ACTIVE_STATUSES: SosAlertStatus[] = ['ACTIVE', 'NEEDS_HELP'];
@@ -75,10 +75,20 @@ export default function SuperAdminSosLogsPage() {
   const [dateFilter, setDateFilter] = useState('');
 
   useEffect(() => {
-    api<{ alerts: SuperAdminSosAlert[] }>('/super-admin/sos-logs', { suppressErrorLog: true })
-      .then((data) => setAlerts(data.alerts))
-      .catch(() => setLoadError('Unable to load SOS records. Please refresh or contact support.'))
-      .finally(() => setLoading(false));
+    const paths = ['/admin/sos/super-admin-logs', '/super-admin/sos-logs'] as const;
+
+    (async () => {
+      for (const path of paths) {
+        try {
+          const data = await api<{ alerts: SuperAdminSosAlert[] }>(path, { suppressErrorLog: true });
+          setAlerts(data.alerts);
+          return;
+        } catch (err) {
+          if (!(err instanceof ApiError) || err.status !== 404) break;
+        }
+      }
+      setLoadError('Unable to load SOS records. Please refresh or contact support.');
+    })().finally(() => setLoading(false));
   }, []);
 
   const summary = useMemo(() => {

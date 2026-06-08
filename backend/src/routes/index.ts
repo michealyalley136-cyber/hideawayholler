@@ -64,6 +64,7 @@ router.use('/house-assignments', houseAssignmentRoutes);
 router.use('/business-billing', businessBillingRoutes);
 router.use('/community', communityRoutes);
 router.get('/super-admin/sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
+router.get('/super-admin-sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 // Vercel-safe alias for super admin client dashboard
 router.get('/super-admin-hideaway-holler', authenticate, authorizeSuperAdmin, getSuperAdminClientDashboard);
 

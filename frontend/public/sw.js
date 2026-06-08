@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hollerhub-static-v7';
+const CACHE_NAME = 'hollerhub-static-v8';
 const STATIC_ASSETS = [
   '/manifest.webmanifest',
   '/icons/icon-192.png',

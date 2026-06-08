@@ -18,6 +18,8 @@ router.get('/sos/active', authenticate, authorizeAdmin, sos.listActiveAdminSosAl
 // Vercel Hobby plan routes through api/admin/sos/[...path].ts — reuse that handler for dashboard metrics.
 router.get('/sos/dashboard-stats', authenticate, authorizeAdmin, dashboard.adminDashboard);
 router.get('/sos/history', authenticate, authorizeAdminOrSuperAdmin, sos.listSosHistory);
+// Vercel-safe alias for Super Admin SOS records (api/admin/sos/[...path].ts).
+router.get('/sos/super-admin-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 // Single-segment routes (sosAlertId in body). Vercel's nested catch-all does not resolve
 // multi-segment dynamic paths like /sos/:id/acknowledge, so these are the production-safe routes.
 router.post('/sos/acknowledge', authenticate, authorizeAdmin, sos.acknowledgeSosAlert);

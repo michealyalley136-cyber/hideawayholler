@@ -12,6 +12,7 @@ export function resolveBackendTargetPath(joinedPath: string) {
   const legacySosAction = joinedPath.match(/^admin\/sos\/([^/]+)\/(acknowledge|resolve|mute)$/);
   if (legacySosAction) return `admin/sos/${legacySosAction[2]}`;
   if (joinedPath === 'admin/sos/dashboard-stats') return 'admin/sos/dashboard-stats';
+  if (joinedPath === 'super-admin/sos-logs') return 'admin/sos/super-admin-logs';
   if (
     joinedPath === 'dashboard/admin' ||
     joinedPath === 'admin/dashboard' ||

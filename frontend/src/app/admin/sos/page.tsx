@@ -99,26 +99,27 @@ export default function AdminSosCenter() {
     setActionId(`${alert.id}:${action}`);
     setActionStatus(action === 'ACKNOWLEDGE' ? 'Acknowledging SOS...' : 'Resolving SOS...');
     try {
-      const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; success?: boolean }>(
+      const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; sos?: SosAlert; success?: boolean }>(
         action === 'ACKNOWLEDGE' ? `/admin/sos/${alert.id}/acknowledge` : `/admin/sos/${alert.id}/resolve`,
         {
           method: 'POST',
         }
       );
-      const nextAlert = data.alert || data.sosAlert;
+      const nextAlert = data.alert || data.sosAlert || data.sos;
       if (!nextAlert?.id) throw new Error('Backend did not return the updated SOS alert.');
 
       setAlerts((current) => (action === 'RESOLVE' ? current.filter((item) => item.id !== nextAlert.id) : current.map((item) => (item.id === nextAlert.id ? nextAlert : item))));
       setActionStatus(action === 'ACKNOWLEDGE' ? 'SOS acknowledged.' : 'SOS resolved.');
       await loadAlerts();
     } catch (err) {
-      setActionStatus(
-        err instanceof Error && err.message.includes('Insufficient permissions')
+      const reason = err instanceof Error ? err.message : 'Unknown error';
+      const base =
+        reason.includes('Insufficient permissions')
           ? 'You do not have permission to manage this SOS alert.'
           : action === 'ACKNOWLEDGE'
             ? 'Failed to acknowledge SOS.'
-            : 'Failed to resolve SOS.'
-      );
+            : 'Failed to resolve SOS.';
+      setActionStatus(reason && !base.includes(reason) ? `${base} (${reason})` : base);
     } finally {
       setActionId(null);
     }

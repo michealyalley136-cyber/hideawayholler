@@ -788,14 +788,25 @@ export async function getSosAlert(req: AuthRequest, res: Response) {
 }
 
 export async function acknowledgeSosAlert(req: AuthRequest, res: Response) {
-  const updated = await updateSosAcknowledgement(req.params.sosAlertId, req.user!.userId, req.user);
-
-  if (updated === 'FORBIDDEN') return res.status(403).json({ error: 'Insufficient permissions for this SOS alert' });
-  if (!updated) {
-    return res.status(404).json({ error: 'SOS alert not found' });
+  const sosAlertId = req.params.sosAlertId;
+  if (!sosAlertId) {
+    return res.status(400).json({ success: false, error: 'Missing SOS alert ID.' });
   }
 
-  res.json({ success: true, sosAlert: updated, alert: updated });
+  try {
+    const updated = await updateSosAcknowledgement(sosAlertId, req.user!.userId, req.user);
+
+    if (updated === 'FORBIDDEN') return res.status(403).json({ success: false, error: 'Insufficient permissions for this SOS alert' });
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'SOS alert not found' });
+    }
+
+    return res.json({ success: true, sos: updated, sosAlert: updated, alert: updated });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unexpected error acknowledging SOS alert.';
+    console.error('[sos admin] Acknowledge failed', { sosAlertId, message });
+    return res.status(500).json({ success: false, error: `Unable to acknowledge SOS alert: ${message}` });
+  }
 }
 
 export async function resolveSosAlert(req: AuthRequest, res: Response) {
@@ -827,12 +838,17 @@ export async function muteSosAlert(req: AuthRequest, res: Response) {
 
 export async function adminSosAction(req: AuthRequest, res: Response) {
   const { action } = req.body as { action?: string };
+  if (!req.params.id) {
+    return res.status(400).json({ success: false, error: 'Missing SOS alert ID.' });
+  }
+
+  try {
   const alert = await prisma.sosAlert.findUnique({ where: { id: req.params.id } });
 
   if (!alert) {
-    return res.status(404).json({ error: 'SOS alert not found' });
+    return res.status(404).json({ success: false, error: 'SOS alert not found' });
   }
-  if (!(await canAccessSosAlert(alert, req.user))) return res.status(403).json({ error: 'Insufficient permissions for this SOS alert' });
+  if (!(await canAccessSosAlert(alert, req.user))) return res.status(403).json({ success: false, error: 'Insufficient permissions for this SOS alert' });
 
   const now = new Date();
   const data =
@@ -849,12 +865,12 @@ export async function adminSosAction(req: AuthRequest, res: Response) {
 
   if (action === 'ACKNOWLEDGE') {
     const updated = await updateSosAcknowledgement(alert.id, req.user!.userId, req.user);
-    if (updated === 'FORBIDDEN') return res.status(403).json({ error: 'Insufficient permissions for this SOS alert' });
-    return res.json({ success: true, sosAlert: updated, alert: updated });
+    if (updated === 'FORBIDDEN') return res.status(403).json({ success: false, error: 'Insufficient permissions for this SOS alert' });
+    return res.json({ success: true, sos: updated, sosAlert: updated, alert: updated });
   }
 
   if (!data) {
-    return res.status(400).json({ error: 'Unsupported admin SOS action' });
+    return res.status(400).json({ success: false, error: 'Unsupported admin SOS action' });
   }
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -900,5 +916,10 @@ export async function adminSosAction(req: AuthRequest, res: Response) {
       message: err instanceof Error ? err.message : 'Unknown mirror update error',
     });
   });
-  res.json({ success: true, sosAlert: updated, alert: updated });
+  return res.json({ success: true, sos: updated, sosAlert: updated, alert: updated });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unexpected error updating SOS alert.';
+    console.error('[sos admin] Admin SOS action failed', { sosAlertId: req.params.id, action, message });
+    return res.status(500).json({ success: false, error: `Unable to ${action === 'RESOLVE' ? 'resolve' : 'update'} SOS alert: ${message}` });
+  }
 }

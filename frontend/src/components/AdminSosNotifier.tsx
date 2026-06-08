@@ -106,6 +106,7 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
   const [lastActionClicked, setLastActionClicked] = useState('None');
   const [lastActionEndpoint, setLastActionEndpoint] = useState('None');
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const dismissedIdsRef = useRef<Set<string>>(new Set());
   const sirenPlayingRef = useRef(false);
 
   const canRun = role === 'ADMIN';
@@ -135,6 +136,12 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
       const nextIds = new Set(sirenAlerts.map((alert) => alert.id));
       const newAlerts = sirenAlerts.filter((alert) => !seenIdsRef.current.has(alert.id));
 
+      // Drop dismissed ids that are no longer active so a future re-trigger can surface again.
+      const activeIds = new Set(responderAlerts.map((alert) => alert.id));
+      dismissedIdsRef.current.forEach((id) => {
+        if (!activeIds.has(id)) dismissedIdsRef.current.delete(id);
+      });
+
       setAlerts(data.alerts);
       setLastCheckTime(new Date().toLocaleTimeString());
       setLastFetchStatus('OK');
@@ -143,11 +150,14 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
       setBusinessId(data.businessId || null);
       onCountChange?.(responderAlerts.length);
 
-      if (canShowEmergencyModal && responderAlerts.length > 0 && !featuredAlert) {
-        setFeaturedAlert(responderAlerts[0]);
-      }
+      // A genuinely new SOS always reopens the modal, even if a different one was minimized.
       if (canShowEmergencyModal && newAlerts.length > 0) {
-        setFeaturedAlert(newAlerts[0]);
+        const nextNew = newAlerts.find((alert) => !dismissedIdsRef.current.has(alert.id)) || newAlerts[0];
+        setFeaturedAlert(nextNew);
+      } else if (canShowEmergencyModal && responderAlerts.length > 0 && !featuredAlert) {
+        // Respect a manual minimize: only auto-open alerts the admin hasn't dismissed.
+        const nextAlert = responderAlerts.find((alert) => !dismissedIdsRef.current.has(alert.id));
+        if (nextAlert) setFeaturedAlert(nextAlert);
       }
 
       if (sirenAlerts.length > 0 && canPlaySound && soundEnabled) {
@@ -265,11 +275,11 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
       const endpoint = action === 'ACKNOWLEDGE' ? `/admin/sos/${alert.id}/acknowledge` : `/admin/sos/${alert.id}/resolve`;
       setLastActionEndpoint(endpoint);
       if (process.env.NODE_ENV !== 'production') console.debug('[sos admin] modal button clicked', { action, endpoint, alertId: alert.id });
-      const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; success?: boolean }>(endpoint, { method: 'POST' });
-      const nextAlert = data.alert || data.sosAlert;
+      const data = await api<{ alert?: SosAlert; sosAlert?: SosAlert; sos?: SosAlert; success?: boolean }>(endpoint, { method: 'POST' });
+      const nextAlert = data.alert || data.sosAlert || data.sos;
+      if (process.env.NODE_ENV !== 'production') console.debug('[sos admin] action response received', { action, endpoint, response: data });
       if (!nextAlert?.id) throw new Error('Backend did not return the updated SOS alert.');
 
-      if (process.env.NODE_ENV !== 'production') console.debug('[sos admin] action response received', { action, alertId: nextAlert.id });
       setAlerts((current) =>
         action === 'RESOLVE' ? current.filter((item) => item.id !== nextAlert.id) : current.map((item) => (item.id === nextAlert.id ? nextAlert : item))
       );
@@ -281,6 +291,7 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
         stopSiren();
       }
       if (action === 'RESOLVE') {
+        dismissedIdsRef.current.add(nextAlert.id);
         setFeaturedAlert(null);
         setActionStatus('SOS resolved.');
         setLastActionStatus('success');
@@ -289,15 +300,18 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
       }
       await pollActiveAlerts();
     } catch (err) {
-      const message =
-        err instanceof Error && err.message.includes('Insufficient permissions')
+      const reason = err instanceof Error ? err.message : 'Unknown error';
+      const base =
+        reason.includes('Insufficient permissions')
           ? 'You do not have permission to manage this SOS alert.'
           : action === 'ACKNOWLEDGE'
             ? 'Failed to acknowledge SOS.'
             : 'Failed to resolve SOS.';
-      if (process.env.NODE_ENV !== 'production') console.error('[sos admin] action failed', { action, err });
-      setLastFetchError(err instanceof Error ? err.message : message);
-      setActionStatus(message);
+      // Surface the real backend reason in production so the action is debuggable instead of a blind "Failed".
+      const detailed = reason && !base.includes(reason) ? `${base} (${displayFetchError(reason)})` : base;
+      if (process.env.NODE_ENV !== 'production') console.error('[sos admin] action failed', { action, endpoint: `/admin/sos/${alert.id}/${action === 'ACKNOWLEDGE' ? 'acknowledge' : 'resolve'}`, reason, err });
+      setLastFetchError(reason);
+      setActionStatus(detailed);
       setLastActionStatus('failed');
       if (action === 'ACKNOWLEDGE') setAcknowledgeRequestStatus('Failed');
       if (action === 'RESOLVE') setResolveRequestStatus('Failed');
@@ -309,14 +323,16 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
   const openSosCenter = () => {
     if (process.env.NODE_ENV !== 'production') console.info('[sos admin] Open SOS Center clicked');
     setLastActionClicked('open center');
-    setLastActionStatus('loading');
+    setLastActionStatus('success');
     setLastActionEndpoint('/admin/sos');
-    try {
-      router.push('/admin/sos');
-      setLastActionStatus('success');
-    } catch {
-      if (typeof window !== 'undefined') window.location.href = '/admin/sos';
+    // Close the modal locally so it does not immediately reappear from polling on the SOS center page.
+    if (featuredAlert) dismissedIdsRef.current.add(featuredAlert.id);
+    setFeaturedAlert(null);
+    if (typeof window !== 'undefined') {
+      window.location.assign('/admin/sos');
+      return;
     }
+    router.push('/admin/sos');
   };
 
   const callResident = (phone?: string | null) => {
@@ -347,11 +363,13 @@ export function AdminSosAlertManager({ role, onCountChange }: AdminSosAlertManag
   };
 
   const minimizeModal = () => {
-    if (process.env.NODE_ENV !== 'production') console.info('[sos admin] Close clicked');
-    setLastActionClicked('close');
+    if (process.env.NODE_ENV !== 'production') console.info('[sos admin] Minimize clicked', { alertId: featuredAlert?.id });
+    setLastActionClicked('minimize');
     setLastActionEndpoint('local modal minimize');
     setLastActionStatus('success');
-    setActionStatus('SOS modal minimized. The alert remains active until resolved.');
+    setActionStatus('SOS modal minimized. The alert stays in the banner until resolved.');
+    // Remember the minimize so the 3s polling does not immediately reopen the same alert.
+    if (featuredAlert) dismissedIdsRef.current.add(featuredAlert.id);
     setFeaturedAlert(null);
   };
 

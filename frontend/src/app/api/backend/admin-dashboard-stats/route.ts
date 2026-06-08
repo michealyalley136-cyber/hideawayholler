@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 
 // Single-segment Vercel-safe proxy for admin dashboard metrics.
 export async function GET(req: NextRequest) {
-  return proxyToBackend(req, 'admin-dashboard');
+  return proxyToBackend(req, 'admin/sos/dashboard-stats');
 }
 
 export async function OPTIONS() {

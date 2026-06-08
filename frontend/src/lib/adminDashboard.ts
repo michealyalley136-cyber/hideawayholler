@@ -3,6 +3,7 @@ import { DashboardStats } from './types';
 
 // Single-segment paths are required for reliable Vercel routing.
 const DASHBOARD_PATHS = [
+  '/admin/sos/dashboard-stats',
   '/admin-dashboard-stats',
   '/admin/dashboard',
 ] as const;

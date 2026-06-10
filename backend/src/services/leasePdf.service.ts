@@ -28,8 +28,16 @@ export async function generateSignedLeasePdf(data: {
   let pdfDoc: PDFDocument;
 
   if (data.originalFilePath && fs.existsSync(privatePath(data.originalFilePath))) {
-    const originalBytes = fs.readFileSync(privatePath(data.originalFilePath));
-    pdfDoc = await PDFDocument.load(originalBytes);
+    try {
+      const originalBytes = fs.readFileSync(privatePath(data.originalFilePath));
+      pdfDoc = await PDFDocument.load(originalBytes);
+    } catch {
+      pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([612, 792]);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      page.drawText(data.leaseTitle, { x: 54, y: 730, size: 18, font, color: rgb(0.05, 0.08, 0.13) });
+      page.drawText('Original lease document could not be embedded.', { x: 54, y: 700, size: 11, font, color: rgb(0.35, 0.4, 0.5) });
+    }
   } else {
     pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([612, 792]);

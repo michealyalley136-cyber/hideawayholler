@@ -38,8 +38,9 @@ router.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'hollerhub-api' });
 });
 
-// Single-segment Vercel-safe aliases for admin dashboard stats
+// Single-segment Vercel-safe aliases for dashboard stats
 router.get('/admin-dashboard', authenticate, authorizeAdmin, dashboard.adminDashboard);
+router.get('/resident-dashboard', authenticate, dashboard.residentDashboard);
 
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
@@ -72,6 +73,7 @@ router.get('/file-serve', authenticate, serveProtectedFile);
 // Vercel-safe single-segment lease workflow aliases
 router.post('/lease-action', authenticate, authorizeAdmin, lease.leaseAction);
 router.post('/lease-sign', authenticate, lease.signLease);
+router.get('/lease-detail', authenticate, lease.getLease);
 router.get('/lease-download', authenticate, lease.downloadLease);
 router.get('/super-admin/sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 router.get('/super-admin-sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);

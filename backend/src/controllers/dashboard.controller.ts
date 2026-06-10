@@ -75,59 +75,73 @@ export async function adminDashboard(req: AuthRequest, res: Response) {
 }
 
 export async function residentDashboard(req: AuthRequest, res: Response) {
-  const userId = req.user!.userId;
+  try {
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
 
-  const [profile, activeSeason, unreadNotices, payments, maintenance, checkIn, currentHouseAssignment, currentLease] = await Promise.all([
-    prisma.residentProfile.findUnique({ where: { userId }, include: { documents: true } }),
-    prisma.seasonResident.findFirst({
-      where: { userId },
-      include: { season: true },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.notice.count({
-      where: {
-        isPublished: true,
-        NOT: { reads: { some: { userId } } },
-      },
-    }),
-    prisma.payment.findMany({
-      where: { userId },
-      orderBy: { dueDate: 'asc' },
-      take: 5,
-      include: { season: true },
-    }),
-    prisma.maintenanceRequest.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 3,
-    }),
-    prisma.checkIn.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.residentHouseAssignment.findFirst({
-      where: { userId, vacatedAt: null },
-      include: { houseAssignment: true },
-      orderBy: { assignedAt: 'desc' },
-    }),
-    prisma.lease.findFirst({
-      where: { userId, status: { notIn: [LeaseWorkflowStatus.DRAFT, LeaseWorkflowStatus.ARCHIVED] } },
-      orderBy: { createdAt: 'desc' },
-    }),
-  ]);
+    const userId = req.user.userId;
 
-  const status = activeSeason?.status || profile?.currentStatus || ResidentStatus.APPLICANT;
-  const journey = getJourneySteps(status);
+    const [profile, activeSeason, unreadNotices, payments, maintenance, checkIn, currentHouseAssignment, currentLease, openSupplyRequests] = await Promise.all([
+      prisma.residentProfile.findUnique({ where: { userId }, include: { documents: true } }),
+      prisma.seasonResident.findFirst({
+        where: { userId },
+        include: { season: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.notice.count({
+        where: {
+          isPublished: true,
+          NOT: { reads: { some: { userId } } },
+        },
+      }),
+      prisma.payment.findMany({
+        where: { userId },
+        orderBy: { dueDate: 'asc' },
+        take: 5,
+        include: { season: true },
+      }),
+      prisma.maintenanceRequest.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+      }),
+      prisma.checkIn.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.residentHouseAssignment.findFirst({
+        where: { userId, vacatedAt: null },
+        include: { houseAssignment: true },
+        orderBy: { assignedAt: 'desc' },
+      }),
+      prisma.lease.findFirst({
+        where: { userId, status: { notIn: [LeaseWorkflowStatus.DRAFT, LeaseWorkflowStatus.ARCHIVED] } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.supplyRequest.count({
+        where: { userId, status: SupplyRequestStatus.OPEN },
+      }),
+    ]);
 
-  res.json({
-    profile,
-    activeSeason,
-    journey,
-    unreadNotices,
-    recentPayments: payments,
-    recentMaintenance: maintenance,
-    checkIn,
-    currentAssignment: currentHouseAssignment?.houseAssignment.houseName,
-    currentLease,
-  });
+    const status = activeSeason?.status || profile?.currentStatus || ResidentStatus.APPLICANT;
+    const journey = getJourneySteps(status);
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      profile,
+      activeSeason,
+      journey,
+      unreadNotices,
+      recentPayments: payments,
+      recentMaintenance: maintenance,
+      checkIn,
+      currentAssignment: currentHouseAssignment?.houseAssignment?.houseName ?? null,
+      currentLease,
+      openSupplyRequests,
+    });
+  } catch (err) {
+    console.error('[dashboard] resident failed', { userId: req.user?.userId, err });
+    res.status(500).json({ success: false, error: 'Unable to load resident dashboard.' });
+  }
 }

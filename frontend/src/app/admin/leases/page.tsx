@@ -42,6 +42,23 @@ function statusClass(status: string) {
   return 'bg-slate-100 text-slate-700';
 }
 
+function logLeaseRequest(
+  action: string,
+  details: {
+    endpoint: string;
+    method: string;
+    leaseId?: string;
+    residentId?: string;
+    fileName?: string;
+    fileType?: string;
+    body?: unknown;
+    status?: number;
+    response?: unknown;
+  }
+) {
+  console.error(`[admin/leases] ${action}`, details);
+}
+
 async function downloadLease(id: string, type: 'original' | 'signed') {
   const token = getStoredToken();
   const res = await fetch(apiPath(`/lease-download?leaseId=${encodeURIComponent(id)}&type=${type}`), {
@@ -113,15 +130,34 @@ export default function AdminLeasesPage() {
     if (seasonId) form.append('seasonId', seasonId);
     form.append('file', file);
 
+    const endpoint = apiPath('/leases');
+    const requestLog = {
+      endpoint,
+      method: 'POST',
+      residentId: userId,
+      fileName: file.name,
+      fileType: file.type,
+      body: { title: title.trim(), userId, seasonId, file: file.name },
+    };
+
     setAssigning(true);
     try {
-      await api('/leases', { method: 'POST', body: form });
+      const result = await api<{ success?: boolean; lease?: Lease }>('/leases', { method: 'POST', body: form });
+      logLeaseRequest('Assign success', {
+        ...requestLog,
+        leaseId: result.lease?.id,
+        status: 201,
+        response: result,
+      });
       setTitle('');
       setUserId('');
       setFile(null);
       setSuccessMessage(`Lease assigned to ${resident?.profile?.fullName || resident?.email || 'resident'}.`);
       await load();
     } catch (err) {
+      const status = err instanceof ApiError ? err.status : undefined;
+      const response = err instanceof ApiError ? err.details : undefined;
+      logLeaseRequest('Assign failed', { ...requestLog, status, response });
       setErrorMessage(err instanceof ApiError ? err.message : 'Unable to assign lease.');
     } finally {
       setAssigning(false);
@@ -138,10 +174,25 @@ export default function AdminLeasesPage() {
     setErrorMessage('');
     setActionLeaseId(lease.id);
 
+    const endpoint = apiPath('/lease-action');
+    const requestBody = { leaseId: lease.id, action: leaseAction };
+    const requestLog = {
+      endpoint,
+      method: 'POST',
+      leaseId: lease.id,
+      residentId: lease.user?.id,
+      body: requestBody,
+    };
+
     try {
-      await api('/lease-action', {
+      const result = await api<{ success?: boolean; lease?: Lease }>('/lease-action', {
         method: 'POST',
-        body: { leaseId: lease.id, action: leaseAction },
+        body: requestBody,
+      });
+      logLeaseRequest(`${leaseAction} success`, {
+        ...requestLog,
+        status: 200,
+        response: result,
       });
 
       const labels: Record<string, string> = {
@@ -153,6 +204,9 @@ export default function AdminLeasesPage() {
       setSuccessMessage(`Lease ${labels[leaseAction] || leaseAction.toLowerCase()} successfully.`);
       await load();
     } catch (err) {
+      const status = err instanceof ApiError ? err.status : undefined;
+      const response = err instanceof ApiError ? err.details : undefined;
+      logLeaseRequest(`${leaseAction} failed`, { ...requestLog, status, response });
       setErrorMessage(err instanceof ApiError ? err.message : `Unable to ${leaseAction.toLowerCase()} lease.`);
     } finally {
       setActionLeaseId(null);

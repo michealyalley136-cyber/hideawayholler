@@ -3,9 +3,10 @@ import { DashboardStats } from './types';
 
 // Single-segment paths are required for reliable Vercel routing.
 const DASHBOARD_PATHS = [
-  '/admin/sos/dashboard-stats',
+  '/admin-dashboard',
   '/admin-dashboard-stats',
   '/admin/dashboard',
+  '/admin/sos/dashboard-stats',
 ] as const;
 
 export async function fetchAdminDashboardStats(): Promise<DashboardStats> {

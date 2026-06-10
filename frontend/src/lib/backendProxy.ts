@@ -14,8 +14,13 @@ export function resolveBackendTargetPath(joinedPath: string) {
   if (joinedPath === 'admin/sos/dashboard-stats') return 'admin/sos/dashboard-stats';
   if (joinedPath === 'super-admin/sos-logs') return 'admin/sos/super-admin-logs';
   if (joinedPath.startsWith('lease-download')) return joinedPath;
+  if (joinedPath.startsWith('lease-detail')) return joinedPath;
   const legacyLeaseDownload = joinedPath.match(/^leases\/([^/]+)\/download$/);
   if (legacyLeaseDownload) return `lease-download?leaseId=${encodeURIComponent(legacyLeaseDownload[1])}`;
+  const legacyLeaseDetail = joinedPath.match(/^leases\/([^/]+)$/);
+  if (legacyLeaseDetail && legacyLeaseDetail[1] !== 'my') {
+    return `lease-detail?leaseId=${encodeURIComponent(legacyLeaseDetail[1])}`;
+  }
   if (
     joinedPath === 'dashboard/admin' ||
     joinedPath === 'admin/dashboard' ||
@@ -23,6 +28,7 @@ export function resolveBackendTargetPath(joinedPath: string) {
   ) {
     return 'admin-dashboard';
   }
+  if (joinedPath === 'dashboard/resident') return 'resident-dashboard';
   if (joinedPath === 'super-admin/clients/hideaway-holler') return 'super-admin-hideaway-holler';
   if (joinedPath === 'business-billing/super-admin/clients/hideaway-holler') return 'super-admin-hideaway-holler';
   return joinedPath;
@@ -42,7 +48,8 @@ export async function proxyToBackend(req: NextRequest, targetPath: string, optio
   const headers = new Headers();
   copyHeader(req.headers, headers, 'accept');
   copyHeader(req.headers, headers, 'authorization');
-  if (!headers.has('content-type')) {
+  copyHeader(req.headers, headers, 'content-type');
+  if (!headers.has('content-type') && req.method !== 'GET' && req.method !== 'HEAD') {
     headers.set('content-type', 'application/json');
   }
 

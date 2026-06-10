@@ -7,21 +7,33 @@ export function SignaturePad({ onChange }: { onChange: (value: string) => void }
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [drawing, setDrawing] = useState(false);
 
-  useEffect(() => {
+  const resizeCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
     const scale = window.devicePixelRatio || 1;
-    canvas.width = rect.width * scale;
-    canvas.height = rect.height * scale;
+    canvas.width = Math.floor(rect.width * scale);
+    canvas.height = Math.floor(rect.height * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.scale(scale, scale);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#0f172a';
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, rect.width, rect.height);
+    onChange('');
+  };
+
+  useEffect(() => {
+    resizeCanvas();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const observer = new ResizeObserver(() => resizeCanvas());
+    observer.observe(canvas);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -31,6 +43,7 @@ export function SignaturePad({ onChange }: { onChange: (value: string) => void }
   };
 
   const start = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -43,6 +56,7 @@ export function SignaturePad({ onChange }: { onChange: (value: string) => void }
 
   const move = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawing) return;
+    event.preventDefault();
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -55,13 +69,7 @@ export function SignaturePad({ onChange }: { onChange: (value: string) => void }
   const stop = () => setDrawing(false);
 
   const clear = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, rect.width, rect.height);
-    onChange('');
+    resizeCanvas();
   };
 
   return (
@@ -73,6 +81,7 @@ export function SignaturePad({ onChange }: { onChange: (value: string) => void }
         onPointerMove={move}
         onPointerUp={stop}
         onPointerCancel={stop}
+        onPointerLeave={stop}
         aria-label="Signature pad"
       />
       <Button type="button" variant="secondary" size="sm" onClick={clear}>Clear signature</Button>

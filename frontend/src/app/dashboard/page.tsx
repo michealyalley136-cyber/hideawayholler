@@ -9,7 +9,7 @@ import { JourneyTracker } from '@/components/JourneyTracker';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { WeatherCard } from '@/components/WeatherCard';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { JourneyStep, Payment } from '@/lib/types';
 import { PAYMENT_STATUS_COLORS, STATUS_LABELS } from '@/lib/auth';
 
@@ -21,7 +21,8 @@ export default function ResidentDashboard() {
     unreadNotices: number;
     recentPayments: Payment[];
     recentMaintenance: { id: string; description: string; status: string }[];
-    currentAssignment?: string;
+    currentAssignment?: string | null;
+    openSupplyRequests?: number;
     currentLease?: {
       id: string;
       title: string;
@@ -34,9 +35,14 @@ export default function ResidentDashboard() {
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    api<typeof data>('/dashboard/resident')
-      .then(setData)
-      .catch(() => setLoadError('Unable to load dashboard details. Please refresh or sign in again.'));
+    api<typeof data>('/resident-dashboard')
+      .then((response) => {
+        setData(response);
+        setLoadError('');
+      })
+      .catch((err) => {
+        setLoadError(err instanceof ApiError ? err.message : 'Unable to load dashboard details. Please refresh or sign in again.');
+      });
   }, []);
 
   return (
@@ -77,7 +83,7 @@ export default function ResidentDashboard() {
                   <Bell className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Unread notices</p>
-                    <p className="text-xl font-semibold">{data?.unreadNotices ?? '-'}</p>
+                    <p className="text-xl font-semibold">{data?.unreadNotices ?? 0}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -88,7 +94,7 @@ export default function ResidentDashboard() {
                   <CreditCard className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Recent payments</p>
-                    <p className="text-xl font-semibold">{data?.recentPayments?.length ?? '-'}</p>
+                    <p className="text-xl font-semibold">{data?.recentPayments?.length ?? 0}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -99,7 +105,7 @@ export default function ResidentDashboard() {
                   <Wrench className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Maintenance</p>
-                    <p className="text-xl font-semibold">{data?.recentMaintenance?.length ?? '-'}</p>
+                    <p className="text-xl font-semibold">{data?.recentMaintenance?.length ?? 0}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -110,7 +116,7 @@ export default function ResidentDashboard() {
                   <PackageOpen className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Supply requests</p>
-                    <p className="text-xl font-semibold">House-based</p>
+                    <p className="text-xl font-semibold">{data?.openSupplyRequests ?? 0} open</p>
                   </div>
                 </CardBody>
               </Card>

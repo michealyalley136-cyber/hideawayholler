@@ -4,7 +4,8 @@ import { PaymentStatus } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { computePaymentStatus, computeBalance } from '../utils/payment';
-import { saveFile } from '../utils/storage';
+import { saveSensitiveFile } from '../utils/storage';
+import { logAuditEvent } from '../services/audit.service';
 
 export async function listPayments(req: AuthRequest, res: Response) {
   const where: Record<string, unknown> = {};
@@ -81,6 +82,15 @@ export async function updatePayment(req: AuthRequest, res: Response) {
     });
   }
 
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'PAYMENT_UPDATED',
+    entityType: 'Payment',
+    entityId: payment.id,
+    metadata: { status: payment.status, userId: payment.userId },
+  }).catch(() => undefined);
+
   res.json({ payment });
 }
 
@@ -88,10 +98,26 @@ export async function uploadReceipt(req: AuthRequest, res: Response) {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'No file uploaded' });
 
-  const saved = saveFile(fs.readFileSync(file.path), file.originalname, 'receipts');
+  const existing = await prisma.payment.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ error: 'Payment not found' });
+  if (existing.userId !== req.user!.userId && req.user!.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const saved = saveSensitiveFile(fs.readFileSync(file.path), file.originalname, 'receipts');
   const payment = await prisma.payment.update({
     where: { id: req.params.id },
     data: { receiptPath: saved.filePath, receiptFileName: saved.fileName },
   });
+
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'PAYMENT_RECEIPT_UPLOADED',
+    entityType: 'Payment',
+    entityId: payment.id,
+    metadata: { userId: payment.userId },
+  }).catch(() => undefined);
+
   res.json({ payment });
 }

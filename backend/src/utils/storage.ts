@@ -6,8 +6,8 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || (process.env.VERCEL === '1' ? '/tmp
 const PRIVATE_UPLOAD_DIR = process.env.PRIVATE_UPLOAD_DIR || (process.env.VERCEL === '1' ? '/tmp/private_uploads' : './private_uploads');
 
 export function ensureUploadDirs() {
-  const dirs = ['documents', 'receipts', 'maintenance', 'gallery', 'checkin', 'checkout', 'avatars'];
-  const privateDirs = ['community', 'leases', 'signed-leases'];
+  const dirs = ['gallery', 'avatars'];
+  const privateDirs = ['community', 'leases', 'signed-leases', 'documents', 'receipts', 'maintenance', 'checkin', 'checkout'];
 
   for (const dir of dirs) {
     const full = path.join(UPLOAD_DIR, dir);
@@ -50,6 +50,23 @@ export function savePrivateFile(
 
 export function getPublicUrl(relativePath: string): string {
   return `/uploads/${relativePath}`;
+}
+
+export function getProtectedFileUrl(relativePath: string): string {
+  return `/api/files/serve?path=${encodeURIComponent(relativePath)}`;
+}
+
+const PRIVATE_SUBFOLDERS = new Set(['documents', 'receipts', 'maintenance', 'checkin', 'checkout', 'community', 'leases', 'signed-leases']);
+
+export function saveSensitiveFile(
+  buffer: Buffer,
+  originalName: string,
+  subfolder: string
+): { filePath: string; fileName: string } {
+  if (PRIVATE_SUBFOLDERS.has(subfolder)) {
+    return savePrivateFile(buffer, originalName, subfolder);
+  }
+  return saveFile(buffer, originalName, subfolder);
 }
 
 export function getPrivateUrl(relativePath: string): string {

@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { SupplyRequestStatus, UserRole } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
+import { sanitizeText } from '../utils/sanitize';
 
 export async function listSupplyRequests(req: AuthRequest, res: Response) {
   const isAdmin = req.user!.role === UserRole.ADMIN;
@@ -19,10 +20,10 @@ export async function createSupplyRequest(req: AuthRequest, res: Response) {
   const request = await prisma.supplyRequest.create({
     data: {
       userId: req.user!.userId,
-      house,
-      supplyType,
+      house: sanitizeText(house, 120),
+      supplyType: supplyType as never,
       quantity: Math.max(1, Number(quantity) || 1),
-      notes,
+      notes: sanitizeText(notes, 1000),
     },
   });
 

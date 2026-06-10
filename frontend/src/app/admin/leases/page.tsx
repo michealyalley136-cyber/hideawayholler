@@ -7,7 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { api, apiUrl } from '@/lib/api';
+import { api, apiPath } from '@/lib/api';
 import { getStoredToken } from '@/lib/auth';
 
 interface Lease {
@@ -43,7 +43,7 @@ function statusClass(status: string) {
 
 async function downloadLease(id: string, type: 'original' | 'signed') {
   const token = getStoredToken();
-  const res = await fetch(`${apiUrl}/leases/${id}/download?type=${type}`, {
+  const res = await fetch(apiPath(`/leases/${id}/download?type=${type}`), {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error('Download failed');

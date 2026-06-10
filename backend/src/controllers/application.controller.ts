@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
+import { logAuditEvent } from '../services/audit.service';
+import { sanitizeText } from '../utils/sanitize';
 
 export async function apply(req: AuthRequest, res: Response) {
   const { seasonId, notes } = req.body;
@@ -47,7 +49,7 @@ export async function reviewApplication(req: AuthRequest, res: Response) {
     where: { id: req.params.id },
     data: {
       status,
-      notes,
+      notes: notes !== undefined ? sanitizeText(notes, 2000) : undefined,
       reviewedAt: new Date(),
       reviewedBy: req.user!.userId,
     },
@@ -68,6 +70,15 @@ export async function reviewApplication(req: AuthRequest, res: Response) {
       data: { role: UserRole.RESIDENT },
     });
   }
+
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: status === 'APPROVED' ? 'APPLICATION_APPROVED' : 'APPLICATION_REVIEWED',
+    entityType: 'Application',
+    entityId: application.id,
+    metadata: { status, userId: application.userId },
+  }).catch(() => undefined);
 
   res.json({ application });
 }

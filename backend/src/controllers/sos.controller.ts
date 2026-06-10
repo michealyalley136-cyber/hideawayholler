@@ -9,13 +9,15 @@ import {
   markEmergencyAlertResolved,
   scheduleSosFallbacks,
 } from '../services/emergencyNotification.service';
+import { logAuditEvent } from '../services/audit.service';
+import { sanitizeText } from '../utils/sanitize';
 
 const ACTIVE_STATUSES = [
   SosAlertStatus.ACTIVE,
   SosAlertStatus.ACKNOWLEDGED,
   SosAlertStatus.NEEDS_HELP,
 ];
-const RESIDENT_SOS_ROLES: UserRole[] = [UserRole.RESIDENT, UserRole.APPLICANT, UserRole.ALUMNI];
+const RESIDENT_SOS_ROLES: UserRole[] = [UserRole.RESIDENT];
 
 function parseLocation(body: Record<string, unknown>) {
   const hasLatitude = body.latitude !== undefined && body.latitude !== null && body.latitude !== '';
@@ -364,7 +366,7 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
         residentId: req.user!.userId,
         businessId: business.id,
         emergencyType: typeof req.body.emergencyType === 'string' ? req.body.emergencyType : 'SOS',
-        message: typeof req.body.message === 'string' ? req.body.message : null,
+        message: typeof req.body.message === 'string' ? sanitizeText(req.body.message, 500) : null,
         residentName: context.residentName,
         assignment: context.assignment,
         phone: context.phone,
@@ -426,6 +428,14 @@ export async function createSosAlert(req: AuthRequest, res: Response) {
   });
 
   console.info('[sos resident] SOS record created successfully', { sosAlertId: alert.id, residentId: req.user!.userId, businessId: business.id });
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'SOS_TRIGGERED',
+    entityType: 'SosAlert',
+    entityId: alert.id,
+    metadata: { businessId: business.id, emergencyType: alert.emergencyType },
+  }).catch(() => undefined);
   // Mobile push is disabled for the stable production path; admin dashboards receive SOS through polling.
   void scheduleSosFallbacks(alert.id).catch((err) => {
     console.warn('[sos resident] SOS fallback scheduling failed', {
@@ -801,11 +811,18 @@ export async function acknowledgeSosAlert(req: AuthRequest, res: Response) {
       return res.status(404).json({ success: false, error: 'SOS alert not found' });
     }
 
+    await logAuditEvent({
+      actorId: req.user!.userId,
+      actorRole: req.user!.role,
+      action: 'SOS_ACKNOWLEDGED',
+      entityType: 'SosAlert',
+      entityId: sosAlertId,
+    }).catch(() => undefined);
     return res.json({ success: true, sos: updated, sosAlert: updated, alert: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected error acknowledging SOS alert.';
     console.error('[sos admin] Acknowledge failed', { sosAlertId, message });
-    return res.status(500).json({ success: false, error: `Unable to acknowledge SOS alert: ${message}` });
+    return res.status(500).json({ success: false, error: 'Unable to acknowledge SOS alert. Please try again.' });
   }
 }
 
@@ -921,10 +938,17 @@ export async function adminSosAction(req: AuthRequest, res: Response) {
       message: err instanceof Error ? err.message : 'Unknown mirror update error',
     });
   });
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'SOS_RESOLVED',
+    entityType: 'SosAlert',
+    entityId: updated.id,
+  }).catch(() => undefined);
   return res.json({ success: true, sos: updated, sosAlert: updated, alert: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected error updating SOS alert.';
     console.error('[sos admin] Admin SOS action failed', { sosAlertId: req.params.id, action, message });
-    return res.status(500).json({ success: false, error: `Unable to ${action === 'RESOLVE' ? 'resolve' : 'update'} SOS alert: ${message}` });
+    return res.status(500).json({ success: false, error: 'Unable to update SOS alert. Please try again.' });
   }
 }

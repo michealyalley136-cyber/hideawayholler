@@ -2,7 +2,7 @@ import { Response } from 'express';
 import fs from 'fs';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
-import { saveFile } from '../utils/storage';
+import { saveSensitiveFile } from '../utils/storage';
 
 export async function getCheckOut(req: AuthRequest, res: Response) {
   const userId = (req.query.userId as string) || req.user!.userId;
@@ -23,7 +23,7 @@ export async function submitCheckOut(req: AuthRequest, res: Response) {
 
   if (req.files && Array.isArray(req.files)) {
     for (const file of req.files as Express.Multer.File[]) {
-      const saved = saveFile(fs.readFileSync(file.path), file.originalname, 'checkout');
+      const saved = saveSensitiveFile(fs.readFileSync(file.path), file.originalname, 'checkout');
       roomPhotoPaths.push(saved.filePath);
     }
   }

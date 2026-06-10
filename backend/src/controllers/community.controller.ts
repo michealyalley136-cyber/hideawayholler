@@ -5,6 +5,7 @@ import { CommunityPostType, ApprovalStatus, ReactionType, ReportStatus, SosAlert
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { savePrivateFile, getPrivateUrl, deletePrivateFile } from '../utils/storage';
+import { isAllowedHttpsImageUrl, sanitizeText } from '../utils/sanitize';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -82,11 +83,15 @@ function resolvePostId(req: AuthRequest) {
 export async function createCommunityPost(req: AuthRequest, res: Response) {
   const files = (req.files as Express.Multer.File[]) || [];
   const demoImageUrl = typeof req.body?.demoImageUrl === 'string' ? req.body.demoImageUrl.trim() : '';
+  if (demoImageUrl && !isAllowedHttpsImageUrl(demoImageUrl)) {
+    return res.status(400).json({ error: 'Demo image URL must be a secure Unsplash HTTPS image.' });
+  }
   if (!files.length && !demoImageUrl && !req.body?.caption) {
     return res.status(400).json({ error: 'Add a caption, image, or demo image URL.' });
   }
 
-  const { caption, postType } = req.body;
+  const caption = sanitizeText(req.body?.caption, 2000);
+  const postType = req.body?.postType;
   const userId = req.user!.userId;
   const isAdmin = req.user!.role === UserRole.ADMIN;
 

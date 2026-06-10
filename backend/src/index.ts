@@ -4,6 +4,8 @@ import cors from 'cors';
 import path from 'path';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
+import { securityHeaders } from './middleware/securityHeaders';
+import { generalApiRateLimiter } from './middleware/rateLimit';
 import { ensureUploadDirs } from './utils/storage';
 import { stripeBusinessBillingWebhook } from './controllers/businessBilling.controller';
 
@@ -29,7 +31,7 @@ const corsOptions: cors.CorsOptions = {
       return;
     }
 
-    callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -39,12 +41,16 @@ const corsOptions: cors.CorsOptions = {
 
 ensureUploadDirs();
 
+app.disable('x-powered-by');
+app.use(securityHeaders);
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 app.post('/api/business-billing/webhook', express.raw({ type: 'application/json' }), stripeBusinessBillingWebhook);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.resolve(UPLOAD_DIR)));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use('/uploads/gallery', express.static(path.join(path.resolve(UPLOAD_DIR), 'gallery')));
+app.use('/uploads/avatars', express.static(path.join(path.resolve(UPLOAD_DIR), 'avatars')));
+app.use('/api', generalApiRateLimiter);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'hollerhub-api' });

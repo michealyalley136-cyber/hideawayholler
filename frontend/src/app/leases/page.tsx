@@ -8,8 +8,12 @@ import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SignaturePad } from '@/components/leases/SignaturePad';
-import { api, apiUrl } from '@/lib/api';
+import { api, apiPath } from '@/lib/api';
 import { getStoredToken } from '@/lib/auth';
+
+function leaseDownloadPath(id: string, type: 'original' | 'signed') {
+  return `/leases/${id}/download?type=${type}`;
+}
 
 interface Lease {
   id: string;
@@ -35,7 +39,7 @@ function statusClass(status: string) {
 
 async function downloadLease(id: string, type: 'original' | 'signed') {
   const token = getStoredToken();
-  const res = await fetch(`${apiUrl}/leases/${id}/download?type=${type}`, {
+  const res = await fetch(apiPath(leaseDownloadPath(id, type)), {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) throw new Error('Download failed');

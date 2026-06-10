@@ -24,6 +24,7 @@ import houseAssignmentRoutes from './houseAssignment.routes';
 import sosSettingsRoutes from './sosSettings.routes';
 import businessBillingRoutes from './businessBilling.routes';
 import communityRoutes from './community.routes';
+import filesRoutes from './files.routes';
 import * as sos from '../controllers/sos.controller';
 import * as dashboard from '../controllers/dashboard.controller';
 import { getSuperAdminClientDashboard } from '../controllers/superAdminBilling.controller';
@@ -63,6 +64,7 @@ router.use('/sos-settings', sosSettingsRoutes);
 router.use('/house-assignments', houseAssignmentRoutes);
 router.use('/business-billing', businessBillingRoutes);
 router.use('/community', communityRoutes);
+router.use('/files', filesRoutes);
 router.get('/super-admin/sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 router.get('/super-admin-sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 // Vercel-safe alias for super admin client dashboard

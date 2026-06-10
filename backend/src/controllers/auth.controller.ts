@@ -41,6 +41,15 @@ export async function register(req: AuthRequest, res: Response) {
     include: { profile: true },
   });
 
+  await logAuditEvent({
+    actorId: user.id,
+    actorRole: user.role,
+    action: 'USER_REGISTERED',
+    entityType: 'User',
+    entityId: user.id,
+    metadata: { email: user.email },
+  }).catch(() => undefined);
+
   const token = signToken({ userId: user.id, email: user.email, role: user.role });
   res.status(201).json({
     token,
@@ -64,6 +73,13 @@ export async function login(req: AuthRequest, res: Response) {
     });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+      await logAuditEvent({
+        actorId: null,
+        actorRole: null,
+        action: 'USER_LOGIN_FAILED',
+        entityType: 'User',
+        metadata: { email: normalizedEmail },
+      }).catch(() => undefined);
       return res.status(401).json({ error: 'Invalid email or password', code: 'INVALID_CREDENTIALS' });
     }
 

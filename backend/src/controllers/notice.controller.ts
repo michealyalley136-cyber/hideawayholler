@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
+import { sanitizeText } from '../utils/sanitize';
 
 export async function listNotices(req: AuthRequest, res: Response) {
   const { seasonId, category } = req.query;
@@ -26,17 +27,34 @@ export async function listNotices(req: AuthRequest, res: Response) {
 }
 
 export async function createNotice(req: AuthRequest, res: Response) {
+  const body = req.body || {};
   const notice = await prisma.notice.create({
-    data: { ...req.body, createdBy: req.user!.userId },
+    data: {
+      title: sanitizeText(body.title, 200),
+      content: sanitizeText(body.content, 5000),
+      category: body.category,
+      seasonId: body.seasonId || null,
+      isPinned: !!body.isPinned,
+      isPublished: body.isPublished !== false,
+      createdBy: req.user!.userId,
+    },
     include: { season: true },
   });
   res.status(201).json({ notice });
 }
 
 export async function updateNotice(req: AuthRequest, res: Response) {
+  const body = req.body || {};
   const notice = await prisma.notice.update({
     where: { id: req.params.id },
-    data: req.body,
+    data: {
+      ...(body.title !== undefined && { title: sanitizeText(body.title, 200) }),
+      ...(body.content !== undefined && { content: sanitizeText(body.content, 5000) }),
+      ...(body.category !== undefined && { category: body.category }),
+      ...(body.seasonId !== undefined && { seasonId: body.seasonId || null }),
+      ...(body.isPinned !== undefined && { isPinned: !!body.isPinned }),
+      ...(body.isPublished !== undefined && { isPublished: !!body.isPublished }),
+    },
   });
   res.json({ notice });
 }

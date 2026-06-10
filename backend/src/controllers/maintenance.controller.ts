@@ -1,8 +1,11 @@
 import { Response } from 'express';
 import fs from 'fs';
+import { MaintenanceCategory } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
-import { saveFile } from '../utils/storage';
+import { saveSensitiveFile } from '../utils/storage';
+import { sanitizeText } from '../utils/sanitize';
+import { logAuditEvent } from '../services/audit.service';
 
 export async function listMaintenance(req: AuthRequest, res: Response) {
   const where: Record<string, unknown> = {};
@@ -17,13 +20,18 @@ export async function listMaintenance(req: AuthRequest, res: Response) {
   res.json({ requests });
 }
 
+const MAINTENANCE_CATEGORIES = new Set<string>(['PLUMBING', 'ELECTRICAL', 'APPLIANCE', 'CLEANING', 'OTHER']);
+
 export async function createMaintenance(req: AuthRequest, res: Response) {
   const { category, description } = req.body;
+  if (!MAINTENANCE_CATEGORIES.has(String(category))) {
+    return res.status(400).json({ error: 'Invalid maintenance category' });
+  }
   const mediaPaths: string[] = [];
 
   if (req.files && Array.isArray(req.files)) {
     for (const file of req.files as Express.Multer.File[]) {
-      const saved = saveFile(fs.readFileSync(file.path), file.originalname, 'maintenance');
+      const saved = saveSensitiveFile(fs.readFileSync(file.path), file.originalname, 'maintenance');
       mediaPaths.push(saved.filePath);
     }
   }
@@ -31,8 +39,8 @@ export async function createMaintenance(req: AuthRequest, res: Response) {
   const request = await prisma.maintenanceRequest.create({
     data: {
       userId: req.user!.userId,
-      category,
-      description,
+      category: category as MaintenanceCategory, // validated above
+      description: sanitizeText(description, 2000) || 'Maintenance request',
       mediaPaths,
     },
   });
@@ -43,9 +51,22 @@ export async function updateMaintenance(req: AuthRequest, res: Response) {
   const { status, adminNotes } = req.body;
   const request = await prisma.maintenanceRequest.update({
     where: { id: req.params.id },
-    data: { ...(status && { status }), ...(adminNotes !== undefined && { adminNotes }) },
+    data: {
+      ...(status && { status }),
+      ...(adminNotes !== undefined && { adminNotes: sanitizeText(adminNotes, 2000) }),
+    },
     include: { user: { include: { profile: true } } },
   });
+
+  await logAuditEvent({
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action: 'MAINTENANCE_STATUS_UPDATED',
+    entityType: 'MaintenanceRequest',
+    entityId: request.id,
+    metadata: { status: request.status, userId: request.userId },
+  }).catch(() => undefined);
+
   res.json({ request });
 }
 

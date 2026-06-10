@@ -32,7 +32,7 @@ function cleanApiPath(path: string) {
   return path.startsWith('/') ? path : `/${path}`;
 }
 
-function apiPath(path: string) {
+export function apiPath(path: string) {
   if (/^https?:\/\//.test(path)) return path;
   if (!apiUrl) {
     throw new ApiError(0, 'HollerHub API is not configured. Set NEXT_PUBLIC_API_URL to the deployed backend URL.');
@@ -135,11 +135,7 @@ export async function api<T>(
         return new Promise<T>(() => {});
       }
 
-      if (res.status === 403) {
-        clearAuth();
-        window.location.assign('/login');
-        return new Promise<T>(() => {});
-      }
+      // 403 means authenticated but forbidden — do not clear the session.
     }
 
     throw new ApiError(res.status, message, data);
@@ -150,7 +146,39 @@ export async function api<T>(
 
 export const uploadsUrl = process.env.NEXT_PUBLIC_UPLOADS_URL || (apiOrigin ? `${apiOrigin}/uploads` : '');
 
+const PROTECTED_UPLOAD_PREFIXES = ['documents/', 'receipts/', 'maintenance/', 'checkin/', 'checkout/'];
+
 export function fileUrl(path?: string | null) {
-  if (!path || !uploadsUrl) return null;
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/api/')) return path;
+
+  const isProtected = PROTECTED_UPLOAD_PREFIXES.some((prefix) => path.startsWith(prefix));
+  if (isProtected) {
+    const servePath = `/files/serve?path=${encodeURIComponent(path)}`;
+    return apiPath(servePath);
+  }
+
+  if (!uploadsUrl) return null;
   return `${uploadsUrl}/${path}`;
+}
+
+export async function downloadProtectedFile(path: string, filename?: string) {
+  const token = getToken();
+  const url = fileUrl(path);
+  if (!url) throw new Error('File URL is not configured');
+
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error('Unable to download file');
+
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename || 'download';
+  anchor.rel = 'noopener';
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
 }

@@ -4,7 +4,9 @@ import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { getJourneySteps } from '../utils/residentJourney';
 import fs from 'fs';
-import { deleteFile, getPublicUrl, saveFile } from '../utils/storage';
+import { deleteFile, getPublicUrl, saveFile, saveSensitiveFile } from '../utils/storage';
+import { sanitizeText } from '../utils/sanitize';
+import { logAuditEvent } from '../services/audit.service';
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -55,14 +57,14 @@ export async function updateProfile(req: AuthRequest, res: Response) {
   const profile = await prisma.residentProfile.update({
     where: { userId },
     data: {
-      ...(data.fullName && { fullName: data.fullName }),
-      ...(data.phone !== undefined && { phone: data.phone }),
-      ...(data.country !== undefined && { country: data.country }),
-      ...(data.passportNumber !== undefined && { passportNumber: data.passportNumber }),
-      ...(data.sponsor !== undefined && { sponsor: data.sponsor }),
-      ...(data.employer !== undefined && { employer: data.employer }),
-      ...(data.emergencyContactName !== undefined && { emergencyContactName: data.emergencyContactName }),
-      ...(data.emergencyContactPhone !== undefined && { emergencyContactPhone: data.emergencyContactPhone }),
+      ...(data.fullName && { fullName: sanitizeText(data.fullName, 120) }),
+      ...(data.phone !== undefined && { phone: sanitizeText(data.phone, 40) }),
+      ...(data.country !== undefined && { country: sanitizeText(data.country, 80) }),
+      ...(data.passportNumber !== undefined && { passportNumber: sanitizeText(data.passportNumber, 80) }),
+      ...(data.sponsor !== undefined && { sponsor: sanitizeText(data.sponsor, 120) }),
+      ...(data.employer !== undefined && { employer: sanitizeText(data.employer, 120) }),
+      ...(data.emergencyContactName !== undefined && { emergencyContactName: sanitizeText(data.emergencyContactName, 120) }),
+      ...(data.emergencyContactPhone !== undefined && { emergencyContactPhone: sanitizeText(data.emergencyContactPhone, 40) }),
       ...(data.arrivalDate && { arrivalDate: new Date(data.arrivalDate) }),
       ...(data.departureDate && { departureDate: new Date(data.departureDate) }),
       ...(data.currentStatus && req.user!.role === 'ADMIN' && { currentStatus: data.currentStatus as ResidentStatus }),
@@ -87,7 +89,11 @@ export async function uploadDocument(req: AuthRequest, res: Response) {
   const profile = await prisma.residentProfile.findUnique({ where: { userId } });
   if (!profile) return res.status(404).json({ error: 'Profile not found' });
 
-  const { filePath, fileName } = saveFile(
+  if (!ALLOWED_AVATAR_TYPES.includes(file.mimetype) && file.mimetype !== 'application/pdf') {
+    return res.status(400).json({ error: 'Only JPG, PNG, WEBP, or PDF files are allowed' });
+  }
+
+  const { filePath, fileName } = saveSensitiveFile(
     fs.readFileSync(file.path),
     file.originalname,
     'documents'
@@ -116,6 +122,9 @@ export async function uploadAvatar(req: AuthRequest, res: Response) {
 
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'No file uploaded' });
+  if (!ALLOWED_AVATAR_TYPES.includes(file.mimetype) || file.size > MAX_AVATAR_SIZE) {
+    return res.status(400).json({ error: 'Only JPG, PNG, or WEBP files under 5MB are allowed' });
+  }
 
   const profile = await prisma.residentProfile.findUnique({ where: { userId: targetUserId } });
   if (!profile) return res.status(404).json({ error: 'Profile not found' });

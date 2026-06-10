@@ -53,7 +53,7 @@ export function getPublicUrl(relativePath: string): string {
 }
 
 export function getProtectedFileUrl(relativePath: string): string {
-  return `/api/files/serve?path=${encodeURIComponent(relativePath)}`;
+  return `/api/file-serve?path=${encodeURIComponent(relativePath)}`;
 }
 
 const PRIVATE_SUBFOLDERS = new Set(['documents', 'receipts', 'maintenance', 'checkin', 'checkout', 'community', 'leases', 'signed-leases']);

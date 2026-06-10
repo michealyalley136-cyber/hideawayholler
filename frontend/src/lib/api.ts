@@ -154,7 +154,7 @@ export function fileUrl(path?: string | null) {
 
   const isProtected = PROTECTED_UPLOAD_PREFIXES.some((prefix) => path.startsWith(prefix));
   if (isProtected) {
-    const servePath = `/files/serve?path=${encodeURIComponent(path)}`;
+    const servePath = `/file-serve?path=${encodeURIComponent(path)}`;
     return apiPath(servePath);
   }
 

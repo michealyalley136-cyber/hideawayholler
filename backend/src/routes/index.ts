@@ -25,6 +25,7 @@ import sosSettingsRoutes from './sosSettings.routes';
 import businessBillingRoutes from './businessBilling.routes';
 import communityRoutes from './community.routes';
 import filesRoutes from './files.routes';
+import { serveProtectedFile } from '../controllers/files.controller';
 import * as sos from '../controllers/sos.controller';
 import * as dashboard from '../controllers/dashboard.controller';
 import { getSuperAdminClientDashboard } from '../controllers/superAdminBilling.controller';
@@ -65,6 +66,8 @@ router.use('/house-assignments', houseAssignmentRoutes);
 router.use('/business-billing', businessBillingRoutes);
 router.use('/community', communityRoutes);
 router.use('/files', filesRoutes);
+// Vercel-safe single-segment alias for protected file downloads
+router.get('/file-serve', authenticate, serveProtectedFile);
 router.get('/super-admin/sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 router.get('/super-admin-sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 // Vercel-safe alias for super admin client dashboard

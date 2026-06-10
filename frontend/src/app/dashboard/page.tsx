@@ -14,6 +14,7 @@ import { PAYMENT_STATUS_COLORS, STATUS_LABELS } from '@/lib/auth';
 import {
   EMPTY_RESIDENT_DASHBOARD,
   fetchResidentDashboard,
+  journeyStepsForTracker,
   ResidentDashboardData,
 } from '@/lib/residentDashboard';
 
@@ -53,9 +54,7 @@ export default function ResidentDashboard() {
     };
   }, []);
 
-  const leaseStatusLabel = data.currentLease?.status
-    ? data.currentLease.status.replace(/_/g, ' ')
-    : 'No lease';
+  const journeySteps = journeyStepsForTracker(data.journey);
 
   return (
     <ProtectedRoute roles={['APPLICANT', 'RESIDENT', 'ALUMNI']}>
@@ -63,7 +62,7 @@ export default function ResidentDashboard() {
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              Welcome{data.profile?.fullName ? `, ${data.profile.fullName.split(' ')[0]}` : ''}
+              Welcome{data.resident.name ? `, ${data.resident.name.split(' ')[0]}` : ''}
             </h1>
             {data.activeSeason?.season?.name && (
               <p className="mt-1 text-slate-600">{data.activeSeason.season.name} cohort</p>
@@ -98,7 +97,7 @@ export default function ResidentDashboard() {
                   <Bell className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Unread notices</p>
-                    <p className="text-xl font-semibold">{loading ? 0 : data.unreadNotices}</p>
+                    <p className="text-xl font-semibold">{data.summary.unreadNotices}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -109,7 +108,7 @@ export default function ResidentDashboard() {
                   <CreditCard className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Recent payments</p>
-                    <p className="text-xl font-semibold">{loading ? 0 : data.recentPayments.length}</p>
+                    <p className="text-xl font-semibold">{data.summary.recentPayments}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -120,7 +119,7 @@ export default function ResidentDashboard() {
                   <Wrench className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Maintenance</p>
-                    <p className="text-xl font-semibold">{loading ? 0 : data.recentMaintenance.length}</p>
+                    <p className="text-xl font-semibold">{data.summary.openMaintenance}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -131,7 +130,7 @@ export default function ResidentDashboard() {
                   <PackageOpen className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Supply requests</p>
-                    <p className="text-xl font-semibold">{loading ? '0 open' : `${data.openSupplyRequests} open`}</p>
+                    <p className="text-xl font-semibold">{data.summary.openSupplyRequests} open</p>
                   </div>
                 </CardBody>
               </Card>
@@ -142,7 +141,7 @@ export default function ResidentDashboard() {
                   <Home className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">House Assignment</p>
-                    <p className="text-xl font-semibold">{data.currentAssignment || 'Not assigned'}</p>
+                    <p className="text-xl font-semibold">{data.housing.display}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -153,7 +152,7 @@ export default function ResidentDashboard() {
                   <FileText className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Lease Status</p>
-                    <p className="text-xl font-semibold">{leaseStatusLabel}</p>
+                    <p className="text-xl font-semibold">{data.lease.status}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -164,7 +163,7 @@ export default function ResidentDashboard() {
                   <Wifi className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Wi-Fi Info</p>
-                    <p className="text-xl font-semibold">Hideaway Guest</p>
+                    <p className="text-xl font-semibold">{data.wifi.networkName}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -175,7 +174,7 @@ export default function ResidentDashboard() {
                   <ShieldAlert className="h-5 w-5 text-red-600" />
                   <div>
                     <p className="text-sm text-slate-500">County Alerts</p>
-                    <p className="text-xl font-semibold">CodeRED</p>
+                    <p className="text-xl font-semibold">{data.alerts.countyAlertName}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -201,8 +200,8 @@ export default function ResidentDashboard() {
               <CardBody>
                 {loading ? (
                   <p className="text-sm text-slate-500">Loading journey...</p>
-                ) : data.journey.length ? (
-                  <JourneyTracker steps={data.journey} />
+                ) : journeySteps.length ? (
+                  <JourneyTracker steps={journeySteps} />
                 ) : (
                   <p className="text-sm text-slate-500">No journey steps yet</p>
                 )}
@@ -216,15 +215,15 @@ export default function ResidentDashboard() {
               <CardBody className="space-y-3">
                 {loading ? (
                   <p className="text-sm text-slate-500">Loading payments...</p>
-                ) : data.recentPayments.length ? (
-                  data.recentPayments.map((payment) => (
+                ) : data.recentPaymentsList.length ? (
+                  data.recentPaymentsList.map((payment) => (
                     <div key={payment.id} className="flex items-center justify-between text-sm">
                       <span>{payment.description || payment.type}</span>
                       <Badge className={PAYMENT_STATUS_COLORS[payment.status]}>{STATUS_LABELS[payment.status]}</Badge>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-500">No payments yet</p>
+                  <p className="text-sm text-slate-500">No recent payments yet</p>
                 )}
               </CardBody>
             </Card>

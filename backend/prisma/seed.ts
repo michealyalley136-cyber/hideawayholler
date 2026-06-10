@@ -12,6 +12,9 @@ import {
   SupplyRequestStatus,
   SosAlertStatus,
   BusinessSetupFeeStatus,
+  LeaseWorkflowStatus,
+  ApplicationStatus,
+  HouseAssignmentStatus,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -584,8 +587,211 @@ async function main() {
     });
   }
 
+  await ensureMariaDemoData({
+    residentId: resident.id,
+    seasonId: summer2026.id,
+    adminId: admin.id,
+  });
+
   console.log('Seed completed.');
   console.log('Seeded demo user emails. Passwords are configured through SEED_DEMO_PASSWORD.');
+}
+
+async function ensureMariaDemoData(input: { residentId: string; seasonId: string; adminId: string }) {
+  const { residentId, seasonId, adminId } = input;
+
+  await prisma.residentProfile.update({
+    where: { userId: residentId },
+    data: { currentStatus: ResidentStatus.ACTIVE_RESIDENT },
+  });
+
+  await prisma.seasonResident.upsert({
+    where: { userId_seasonId: { userId: residentId, seasonId } },
+    update: { status: ResidentStatus.ACTIVE_RESIDENT },
+    create: { userId: residentId, seasonId, status: ResidentStatus.ACTIVE_RESIDENT },
+  });
+
+  await prisma.application.upsert({
+    where: { userId_seasonId: { userId: residentId, seasonId } },
+    update: { status: ApplicationStatus.APPROVED },
+    create: { userId: residentId, seasonId, status: ApplicationStatus.APPROVED },
+  });
+
+  const bearHouse = await prisma.houseAssignment.upsert({
+    where: { houseName: 'Bear House' },
+    update: { capacity: 8, status: HouseAssignmentStatus.ACTIVE },
+    create: {
+      houseName: 'Bear House',
+      capacity: 8,
+      occupancy: 1,
+      status: HouseAssignmentStatus.ACTIVE,
+    },
+  });
+
+  const existingHouseAssignment = await prisma.residentHouseAssignment.findFirst({
+    where: { userId: residentId, vacatedAt: null },
+  });
+  if (!existingHouseAssignment) {
+    await prisma.residentHouseAssignment.create({
+      data: {
+        userId: residentId,
+        houseAssignmentId: bearHouse.id,
+        seasonId,
+      },
+    });
+  }
+
+  const mariaLease = await prisma.lease.findFirst({
+    where: { userId: residentId, seasonId },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (mariaLease) {
+    await prisma.lease.update({
+      where: { id: mariaLease.id },
+      data: {
+        title: 'Summer 2026 Housing Agreement',
+        status: LeaseWorkflowStatus.PENDING_SIGNATURE,
+        sentAt: new Date('2026-04-01'),
+        filePath: 'leases/demo-maria-lease.pdf',
+        fileName: 'Summer-2026-Housing-Agreement.pdf',
+        signedAt: null,
+        signedFilePath: null,
+        acknowledged: false,
+      },
+    });
+  } else {
+    await prisma.lease.create({
+      data: {
+        userId: residentId,
+        seasonId,
+        title: 'Summer 2026 Housing Agreement',
+        status: LeaseWorkflowStatus.PENDING_SIGNATURE,
+        sentAt: new Date('2026-04-01'),
+        filePath: 'leases/demo-maria-lease.pdf',
+        fileName: 'Summer-2026-Housing-Agreement.pdf',
+      },
+    });
+  }
+
+  const paymentTemplates = [
+    {
+      type: PaymentType.DEPOSIT,
+      description: 'Security deposit',
+      amountDue: 500,
+      amountPaid: 500,
+      balance: 0,
+      dueDate: new Date('2026-04-15'),
+      status: PaymentStatus.PAID,
+    },
+    {
+      type: PaymentType.RENT,
+      description: 'May 2026 rent',
+      amountDue: 650,
+      amountPaid: 650,
+      balance: 0,
+      dueDate: new Date('2026-05-01'),
+      status: PaymentStatus.PAID,
+    },
+    {
+      type: PaymentType.RENT,
+      description: 'June 2026 rent',
+      amountDue: 650,
+      amountPaid: 325,
+      balance: 325,
+      dueDate: new Date('2026-06-01'),
+      status: PaymentStatus.PARTIAL,
+    },
+  ];
+
+  for (const payment of paymentTemplates) {
+    const existing = await prisma.payment.findFirst({
+      where: { userId: residentId, description: payment.description },
+    });
+    if (!existing) {
+      await prisma.payment.create({
+        data: {
+          userId: residentId,
+          seasonId,
+          ...payment,
+        },
+      });
+    }
+  }
+
+  const noticeTemplates = [
+    {
+      title: 'Community Quiet Hours',
+      content: 'Quiet hours are 10 PM to 7 AM daily. Please respect your neighbors.',
+      category: NoticeCategory.RULES,
+      isPinned: true,
+    },
+    {
+      title: 'Welcome Summer 2026!',
+      content: 'Welcome to Hideaway Holler! Check your dashboard for check-in steps.',
+      category: NoticeCategory.COMMUNITY,
+      isPinned: false,
+    },
+    {
+      title: 'Severe Weather Advisory',
+      content: 'Monitor local weather. Shelter in place during tornado warnings.',
+      category: NoticeCategory.WEATHER,
+      isPinned: false,
+    },
+  ];
+
+  const noticeIds: string[] = [];
+  for (const notice of noticeTemplates) {
+    const existing = await prisma.notice.findFirst({ where: { title: notice.title } });
+    if (existing) {
+      noticeIds.push(existing.id);
+      continue;
+    }
+    const created = await prisma.notice.create({
+      data: {
+        seasonId,
+        title: notice.title,
+        content: notice.content,
+        category: notice.category,
+        isPinned: notice.isPinned,
+        createdBy: adminId,
+      },
+    });
+    noticeIds.push(created.id);
+  }
+
+  await prisma.noticeRead.deleteMany({
+    where: { userId: residentId, noticeId: { in: noticeIds } },
+  });
+
+  const mariaMaintenance = await prisma.maintenanceRequest.findFirst({
+    where: { userId: residentId },
+  });
+  if (!mariaMaintenance) {
+    await prisma.maintenanceRequest.create({
+      data: {
+        userId: residentId,
+        category: 'PLUMBING',
+        description: 'Bathroom sink is draining slowly.',
+        status: MaintenanceStatus.OPEN,
+      },
+    });
+  }
+
+  const mariaSupply = await prisma.supplyRequest.findFirst({
+    where: { userId: residentId, status: SupplyRequestStatus.OPEN },
+  });
+  if (!mariaSupply) {
+    await prisma.supplyRequest.create({
+      data: {
+        userId: residentId,
+        house: 'Bear House',
+        supplyType: 'TOILET_PAPER',
+        quantity: 2,
+        notes: 'Need extra bath towels',
+        status: SupplyRequestStatus.OPEN,
+      },
+    });
+  }
 }
 
 async function ensureAnimalHouses(propertyId: string) {

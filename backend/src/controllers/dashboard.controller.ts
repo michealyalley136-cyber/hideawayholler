@@ -1,10 +1,71 @@
 import { Response } from 'express';
-import { LeaseWorkflowStatus, PaymentStatus, MaintenanceStatus, ResidentStatus, SupplyRequestStatus, ReviewStatus, SosAlertStatus } from '@prisma/client';
+import {
+  LeaseWorkflowStatus,
+  MaintenanceStatus,
+  PaymentStatus,
+  ResidentStatus,
+  ReviewStatus,
+  SosAlertStatus,
+  SupplyRequestStatus,
+  UserRole,
+} from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { getJourneySteps } from '../utils/residentJourney';
 
-const ANIMAL_HOUSES = ['Bear House', 'Deer House', 'Elk House', 'Fox House'];
+const COUNTY_ALERT_URL = 'https://public.coderedweb.com/CNE/en-US/7BCABB4C654F';
+
+function journeyForResponse(status: ResidentStatus) {
+  return getJourneySteps(status).map((step) => ({
+    label: step.label,
+    status: step.current ? 'current' : step.completed ? 'complete' : 'pending',
+  }));
+}
+
+function formatRoleLabel(role: UserRole) {
+  if (role === UserRole.RESIDENT) return 'Resident';
+  if (role === UserRole.APPLICANT) return 'Applicant';
+  if (role === UserRole.ALUMNI) return 'Alumni';
+  return role.replace(/_/g, ' ');
+}
+
+function buildHousingDisplay(
+  houseAssignment: { houseAssignment: { houseName: string } } | null,
+  roomAssignment: { room: { roomNumber: string; building?: { name: string } | null }; bed?: { bedLabel: string } | null } | null
+) {
+  if (houseAssignment?.houseAssignment) {
+    const houseName = houseAssignment.houseAssignment.houseName;
+    return {
+      assigned: true,
+      propertyName: houseName,
+      roomName: null as string | null,
+      bedName: null as string | null,
+      display: houseName,
+    };
+  }
+
+  if (roomAssignment?.room) {
+    const roomName = `Room ${roomAssignment.room.roomNumber}`;
+    const propertyName = roomAssignment.room.building?.name ?? null;
+    const bedName = roomAssignment.bed?.bedLabel ?? null;
+    const display = [roomName, propertyName, bedName ? `Bed ${bedName}` : null].filter(Boolean).join(' · ');
+    return {
+      assigned: true,
+      propertyName,
+      roomName,
+      bedName,
+      display,
+    };
+  }
+
+  return {
+    assigned: false,
+    propertyName: null as string | null,
+    roomName: null as string | null,
+    bedName: null as string | null,
+    display: 'Not assigned',
+  };
+}
 
 export async function adminDashboard(req: AuthRequest, res: Response) {
   const now = new Date();
@@ -82,8 +143,36 @@ export async function residentDashboard(req: AuthRequest, res: Response) {
 
     const userId = req.user.userId;
 
-    const [profile, activeSeason, unreadNotices, payments, maintenance, checkIn, currentHouseAssignment, currentLease, openSupplyRequests] = await Promise.all([
-      prisma.residentProfile.findUnique({ where: { userId }, include: { documents: true } }),
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[dashboard] resident request', { userId, role: req.user.role });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const allowedRoles: UserRole[] = [UserRole.RESIDENT, UserRole.APPLICANT, UserRole.ALUMNI, UserRole.ADMIN, UserRole.SUPER_ADMIN];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    const [
+      activeSeason,
+      unreadNotices,
+      payments,
+      maintenance,
+      openMaintenance,
+      openSupplyRequests,
+      currentHouseAssignment,
+      roomAssignment,
+      currentLease,
+      unreadNoticeList,
+    ] = await Promise.all([
       prisma.seasonResident.findFirst({
         where: { userId },
         include: { season: true },
@@ -97,51 +186,104 @@ export async function residentDashboard(req: AuthRequest, res: Response) {
       }),
       prisma.payment.findMany({
         where: { userId },
-        orderBy: { dueDate: 'asc' },
+        orderBy: { dueDate: 'desc' },
         take: 5,
         include: { season: true },
       }),
       prisma.maintenanceRequest.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        take: 3,
+        take: 5,
       }),
-      prisma.checkIn.findFirst({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
+      prisma.maintenanceRequest.count({
+        where: {
+          userId,
+          status: { in: [MaintenanceStatus.OPEN, MaintenanceStatus.ASSIGNED, MaintenanceStatus.IN_PROGRESS] },
+        },
+      }),
+      prisma.supplyRequest.count({
+        where: { userId, status: SupplyRequestStatus.OPEN },
       }),
       prisma.residentHouseAssignment.findFirst({
         where: { userId, vacatedAt: null },
         include: { houseAssignment: true },
         orderBy: { assignedAt: 'desc' },
       }),
+      prisma.roomAssignment.findFirst({
+        where: { userId, vacatedAt: null },
+        include: { room: { include: { building: true } }, bed: true },
+        orderBy: { assignedAt: 'desc' },
+      }),
       prisma.lease.findFirst({
         where: { userId, status: { notIn: [LeaseWorkflowStatus.DRAFT, LeaseWorkflowStatus.ARCHIVED] } },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.supplyRequest.count({
-        where: { userId, status: SupplyRequestStatus.OPEN },
+      prisma.notice.findMany({
+        where: {
+          isPublished: true,
+          NOT: { reads: { some: { userId } } },
+        },
+        orderBy: { publishedAt: 'desc' },
+        take: 5,
+        select: { id: true, title: true, category: true, publishedAt: true },
       }),
     ]);
 
-    const status = activeSeason?.status || profile?.currentStatus || ResidentStatus.APPLICANT;
-    const journey = getJourneySteps(status);
+    const residentStatus = activeSeason?.status || user.profile?.currentStatus || ResidentStatus.APPLICANT;
+    const housing = buildHousingDisplay(currentHouseAssignment, roomAssignment);
+    const leaseStatusLabel = currentLease ? currentLease.status.replace(/_/g, ' ') : 'No lease';
+
+    const payload = {
+      resident: {
+        id: user.id,
+        name: user.profile?.fullName || user.email,
+        email: user.email,
+        status: formatRoleLabel(user.role),
+      },
+      summary: {
+        unreadNotices: unreadNotices ?? 0,
+        recentPayments: payments.length,
+        openMaintenance: openMaintenance ?? 0,
+        openSupplyRequests: openSupplyRequests ?? 0,
+      },
+      housing,
+      lease: {
+        hasLease: Boolean(currentLease),
+        status: leaseStatusLabel,
+        leaseId: currentLease?.id ?? null,
+        canSign: currentLease?.status === LeaseWorkflowStatus.PENDING_SIGNATURE,
+        title: currentLease?.title ?? null,
+      },
+      wifi: {
+        networkName: 'Hideaway Guest',
+        available: true,
+      },
+      alerts: {
+        countyAlertName: 'CodeRED',
+        countyAlertUrl: COUNTY_ALERT_URL,
+      },
+      journey: journeyForResponse(residentStatus),
+      recentPaymentsList: payments,
+      notices: unreadNoticeList,
+      maintenance,
+      activeSeason: activeSeason ?? null,
+    };
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[dashboard] resident response', {
+        userId,
+        unreadNotices: payload.summary.unreadNotices,
+        payments: payload.summary.recentPayments,
+        housing: payload.housing.display,
+        lease: payload.lease.status,
+      });
+    }
 
     res.setHeader('Cache-Control', 'no-store');
-    res.json({
-      profile: profile ?? null,
-      activeSeason: activeSeason ?? null,
-      journey: journey ?? [],
-      unreadNotices: unreadNotices ?? 0,
-      recentPayments: payments ?? [],
-      recentMaintenance: maintenance ?? [],
-      checkIn: checkIn ?? null,
-      currentAssignment: currentHouseAssignment?.houseAssignment?.houseName ?? null,
-      currentLease: currentLease ?? null,
-      openSupplyRequests: openSupplyRequests ?? 0,
-    });
+    res.json(payload);
   } catch (err) {
-    console.error('[dashboard] resident failed', { userId: req.user?.userId, err });
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[dashboard] resident failed', { userId: req.user?.userId, message });
     res.status(500).json({ success: false, error: 'Unable to load resident dashboard.' });
   }
 }

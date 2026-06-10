@@ -28,7 +28,8 @@ export function resolveBackendTargetPath(joinedPath: string) {
   ) {
     return 'admin-dashboard';
   }
-  if (joinedPath === 'dashboard/resident') return 'resident-dashboard';
+  if (joinedPath === 'dashboard/resident') return 'dashboard/resident';
+  if (joinedPath === 'profiles/resident-dashboard') return 'profiles/resident-dashboard';
   if (joinedPath === 'super-admin/clients/hideaway-holler') return 'super-admin-hideaway-holler';
   if (joinedPath === 'business-billing/super-admin/clients/hideaway-holler') return 'super-admin-hideaway-holler';
   return joinedPath;

@@ -28,6 +28,7 @@ import filesRoutes from './files.routes';
 import { serveProtectedFile } from '../controllers/files.controller';
 import * as sos from '../controllers/sos.controller';
 import * as dashboard from '../controllers/dashboard.controller';
+import * as lease from '../controllers/lease.controller';
 import { getSuperAdminClientDashboard } from '../controllers/superAdminBilling.controller';
 import { authenticate, authorizeAdmin, authorizeSuperAdmin } from '../middleware/auth';
 
@@ -68,6 +69,10 @@ router.use('/community', communityRoutes);
 router.use('/files', filesRoutes);
 // Vercel-safe single-segment alias for protected file downloads
 router.get('/file-serve', authenticate, serveProtectedFile);
+// Vercel-safe single-segment lease workflow aliases
+router.post('/lease-action', authenticate, authorizeAdmin, lease.leaseAction);
+router.post('/lease-sign', authenticate, lease.signLease);
+router.get('/lease-download', authenticate, lease.downloadLease);
 router.get('/super-admin/sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 router.get('/super-admin-sos-logs', authenticate, authorizeSuperAdmin, sos.listSuperAdminSosLogs);
 // Vercel-safe alias for super admin client dashboard

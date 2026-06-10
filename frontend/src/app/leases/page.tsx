@@ -12,7 +12,7 @@ import { api, apiPath } from '@/lib/api';
 import { getStoredToken } from '@/lib/auth';
 
 function leaseDownloadPath(id: string, type: 'original' | 'signed') {
-  return `/leases/${id}/download?type=${type}`;
+  return `/lease-download?leaseId=${encodeURIComponent(id)}&type=${type}`;
 }
 
 interface Lease {
@@ -66,7 +66,10 @@ export default function LeasesPage() {
       setMessage('Please sign before submitting.');
       return;
     }
-    const res = await api<{ lease: Lease }>(`/leases/${signingLease.id}/sign`, { method: 'POST', body: { signatureData } });
+    const res = await api<{ lease: Lease }>('/lease-sign', {
+      method: 'POST',
+      body: { leaseId: signingLease.id, signatureData },
+    });
     setLeases((current) => current.map((lease) => (lease.id === res.lease.id ? res.lease : lease)));
     setSigningLease(null);
     setSignatureData('');

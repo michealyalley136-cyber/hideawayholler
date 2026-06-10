@@ -57,8 +57,24 @@ export async function listLeases(req: AuthRequest, res: Response) {
   res.json({ leases });
 }
 
+function resolveLeaseId(req: AuthRequest) {
+  const fromBody = (req.body as { leaseId?: string } | undefined)?.leaseId;
+  return req.params.id || fromBody || String(req.query.leaseId || '');
+}
+
 export async function createLease(req: AuthRequest, res: Response) {
   const { userId, seasonId, title, sentAt, expiresAt, notes, status } = req.body;
+
+  if (!String(title || '').trim()) {
+    return res.status(400).json({ error: 'Lease title is required' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'Resident is required' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'Lease PDF is required' });
+  }
+
   let filePath: string | undefined;
   let fileName: string | undefined;
 
@@ -106,8 +122,11 @@ export async function createLease(req: AuthRequest, res: Response) {
 }
 
 export async function signLease(req: AuthRequest, res: Response) {
+  const leaseId = resolveLeaseId(req);
+  if (!leaseId) return res.status(400).json({ error: 'Lease ID is required' });
+
   const { signatureData } = req.body as { signatureData?: string };
-  const lease = await prisma.lease.findUnique({ where: { id: req.params.id }, include: includeLeaseRelations() });
+  const lease = await prisma.lease.findUnique({ where: { id: leaseId }, include: includeLeaseRelations() });
   if (!lease) return res.status(404).json({ error: 'Lease not found' });
   if (lease.userId !== req.user!.userId) return res.status(403).json({ error: 'Forbidden' });
   if (lease.status === LeaseWorkflowStatus.COMPLETED || lease.status === LeaseWorkflowStatus.ARCHIVED) {
@@ -126,7 +145,7 @@ export async function signLease(req: AuthRequest, res: Response) {
   });
 
   const updated = await prisma.lease.update({
-    where: { id: req.params.id },
+    where: { id: leaseId },
     data: {
       acknowledged: true,
       acknowledgedAt: signedAt,
@@ -166,10 +185,20 @@ export async function getLease(req: AuthRequest, res: Response) {
 
 export async function leaseAction(req: AuthRequest, res: Response) {
   const { action, userId, seasonId } = req.body as { action?: string; userId?: string; seasonId?: string };
-  const lease = await prisma.lease.findUnique({ where: { id: req.params.id } });
+  const leaseId = resolveLeaseId(req);
+  if (!leaseId) return res.status(400).json({ error: 'Lease ID is required' });
+  if (!action) return res.status(400).json({ error: 'Lease action is required' });
+
+  const lease = await prisma.lease.findUnique({ where: { id: leaseId } });
   if (!lease) return res.status(404).json({ error: 'Lease not found' });
   if (lease.status === LeaseWorkflowStatus.COMPLETED && action !== 'ARCHIVE') {
     return res.status(409).json({ error: 'Completed leases cannot be altered' });
+  }
+  if (action === 'APPROVE' && lease.status !== LeaseWorkflowStatus.SIGNED_BY_RESIDENT) {
+    return res.status(409).json({ error: 'Only resident-signed leases can be approved' });
+  }
+  if (action === 'ARCHIVE' && lease.status === LeaseWorkflowStatus.ARCHIVED) {
+    return res.status(409).json({ error: 'Lease is already archived' });
   }
 
   const now = new Date();
@@ -216,7 +245,10 @@ export async function leaseAction(req: AuthRequest, res: Response) {
 }
 
 export async function downloadLease(req: AuthRequest, res: Response) {
-  const lease = await prisma.lease.findUnique({ where: { id: req.params.id } });
+  const leaseId = resolveLeaseId(req);
+  if (!leaseId) return res.status(400).json({ error: 'Lease ID is required' });
+
+  const lease = await prisma.lease.findUnique({ where: { id: leaseId } });
   if (!lease) return res.status(404).json({ error: 'Lease not found' });
   if (!canAccessLease(req, lease)) return res.status(403).json({ error: 'Forbidden' });
 

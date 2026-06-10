@@ -13,6 +13,9 @@ export function resolveBackendTargetPath(joinedPath: string) {
   if (legacySosAction) return `admin/sos/${legacySosAction[2]}`;
   if (joinedPath === 'admin/sos/dashboard-stats') return 'admin/sos/dashboard-stats';
   if (joinedPath === 'super-admin/sos-logs') return 'admin/sos/super-admin-logs';
+  if (joinedPath.startsWith('lease-download')) return joinedPath;
+  const legacyLeaseDownload = joinedPath.match(/^leases\/([^/]+)\/download$/);
+  if (legacyLeaseDownload) return `lease-download?leaseId=${encodeURIComponent(legacyLeaseDownload[1])}`;
   if (
     joinedPath === 'dashboard/admin' ||
     joinedPath === 'admin/dashboard' ||

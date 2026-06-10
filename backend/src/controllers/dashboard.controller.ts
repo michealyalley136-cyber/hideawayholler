@@ -129,16 +129,16 @@ export async function residentDashboard(req: AuthRequest, res: Response) {
 
     res.setHeader('Cache-Control', 'no-store');
     res.json({
-      profile,
-      activeSeason,
-      journey,
-      unreadNotices,
-      recentPayments: payments,
-      recentMaintenance: maintenance,
-      checkIn,
+      profile: profile ?? null,
+      activeSeason: activeSeason ?? null,
+      journey: journey ?? [],
+      unreadNotices: unreadNotices ?? 0,
+      recentPayments: payments ?? [],
+      recentMaintenance: maintenance ?? [],
+      checkIn: checkIn ?? null,
       currentAssignment: currentHouseAssignment?.houseAssignment?.houseName ?? null,
-      currentLease,
-      openSupplyRequests,
+      currentLease: currentLease ?? null,
+      openSupplyRequests: openSupplyRequests ?? 0,
     });
   } catch (err) {
     console.error('[dashboard] resident failed', { userId: req.user?.userId, err });

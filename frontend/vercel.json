@@ -9,10 +9,6 @@
     {
       "source": "/api/backend/admin/dashboard",
       "destination": "/api/backend/admin-dashboard-stats"
-    },
-    {
-      "source": "/api/backend/dashboard/resident",
-      "destination": "/api/backend/resident-dashboard"
     }
   ]
 }

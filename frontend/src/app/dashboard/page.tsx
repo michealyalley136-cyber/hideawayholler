@@ -9,41 +9,53 @@ import { JourneyTracker } from '@/components/JourneyTracker';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { WeatherCard } from '@/components/WeatherCard';
-import { api, ApiError } from '@/lib/api';
-import { JourneyStep, Payment } from '@/lib/types';
+import { ApiError } from '@/lib/api';
 import { PAYMENT_STATUS_COLORS, STATUS_LABELS } from '@/lib/auth';
+import {
+  EMPTY_RESIDENT_DASHBOARD,
+  fetchResidentDashboard,
+  ResidentDashboardData,
+} from '@/lib/residentDashboard';
 
 export default function ResidentDashboard() {
-  const [data, setData] = useState<{
-    profile: { fullName: string; currentStatus: string };
-    activeSeason?: { season: { name: string } };
-    journey: JourneyStep[];
-    unreadNotices: number;
-    recentPayments: Payment[];
-    recentMaintenance: { id: string; description: string; status: string }[];
-    currentAssignment?: string | null;
-    openSupplyRequests?: number;
-    currentLease?: {
-      id: string;
-      title: string;
-      status: string;
-      sentAt?: string;
-      signedAt?: string;
-      signedFilePath?: string;
-    };
-  } | null>(null);
+  const [data, setData] = useState<ResidentDashboardData>(EMPTY_RESIDENT_DASHBOARD);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    api<typeof data>('/resident-dashboard')
+    let active = true;
+
+    fetchResidentDashboard()
       .then((response) => {
+        if (!active) return;
         setData(response);
         setLoadError('');
       })
       .catch((err) => {
-        setLoadError(err instanceof ApiError ? err.message : 'Unable to load dashboard details. Please refresh or sign in again.');
+        if (!active) return;
+        setData(EMPTY_RESIDENT_DASHBOARD);
+        if (err instanceof ApiError) {
+          if (err.status === 401 || err.status === 403) {
+            setLoadError('Session expired. Please sign in again.');
+            return;
+          }
+          setLoadError(err.message || 'Unable to load dashboard details. Please refresh or sign in again.');
+          return;
+        }
+        setLoadError('Unable to load dashboard details. Please refresh or sign in again.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const leaseStatusLabel = data.currentLease?.status
+    ? data.currentLease.status.replace(/_/g, ' ')
+    : 'No lease';
 
   return (
     <ProtectedRoute roles={['APPLICANT', 'RESIDENT', 'ALUMNI']}>
@@ -51,9 +63,9 @@ export default function ResidentDashboard() {
         <div className="space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              Welcome{data?.profile ? `, ${data.profile.fullName.split(' ')[0]}` : ''}
+              Welcome{data.profile?.fullName ? `, ${data.profile.fullName.split(' ')[0]}` : ''}
             </h1>
-            {data?.activeSeason && (
+            {data.activeSeason?.season?.name && (
               <p className="mt-1 text-slate-600">{data.activeSeason.season.name} cohort</p>
             )}
           </div>
@@ -74,7 +86,10 @@ export default function ResidentDashboard() {
               </Link>
             ))}
           </div>
-          {loadError && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{loadError}</p>}
+
+          {loadError && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{loadError}</p>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Link href="/notices" className="block">
@@ -83,7 +98,7 @@ export default function ResidentDashboard() {
                   <Bell className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Unread notices</p>
-                    <p className="text-xl font-semibold">{data?.unreadNotices ?? 0}</p>
+                    <p className="text-xl font-semibold">{loading ? 0 : data.unreadNotices}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -94,7 +109,7 @@ export default function ResidentDashboard() {
                   <CreditCard className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Recent payments</p>
-                    <p className="text-xl font-semibold">{data?.recentPayments?.length ?? 0}</p>
+                    <p className="text-xl font-semibold">{loading ? 0 : data.recentPayments.length}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -105,7 +120,7 @@ export default function ResidentDashboard() {
                   <Wrench className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Maintenance</p>
-                    <p className="text-xl font-semibold">{data?.recentMaintenance?.length ?? 0}</p>
+                    <p className="text-xl font-semibold">{loading ? 0 : data.recentMaintenance.length}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -116,7 +131,7 @@ export default function ResidentDashboard() {
                   <PackageOpen className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Supply requests</p>
-                    <p className="text-xl font-semibold">{data?.openSupplyRequests ?? 0} open</p>
+                    <p className="text-xl font-semibold">{loading ? '0 open' : `${data.openSupplyRequests} open`}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -127,7 +142,7 @@ export default function ResidentDashboard() {
                   <Home className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">House Assignment</p>
-                    <p className="text-xl font-semibold">{data?.currentAssignment || 'Not assigned'}</p>
+                    <p className="text-xl font-semibold">{data.currentAssignment || 'Not assigned'}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -138,7 +153,7 @@ export default function ResidentDashboard() {
                   <FileText className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-sm text-slate-500">Lease Status</p>
-                    <p className="text-xl font-semibold">{data?.currentLease?.status ? data.currentLease.status.replace(/_/g, ' ') : 'No lease'}</p>
+                    <p className="text-xl font-semibold">{leaseStatusLabel}</p>
                   </div>
                 </CardBody>
               </Card>
@@ -184,7 +199,13 @@ export default function ResidentDashboard() {
                 <h2 className="font-semibold text-slate-900">Your journey</h2>
               </CardHeader>
               <CardBody>
-                {data?.journey ? <JourneyTracker steps={data.journey} /> : <p className="text-sm text-slate-500">Loading...</p>}
+                {loading ? (
+                  <p className="text-sm text-slate-500">Loading journey...</p>
+                ) : data.journey.length ? (
+                  <JourneyTracker steps={data.journey} />
+                ) : (
+                  <p className="text-sm text-slate-500">No journey steps yet</p>
+                )}
               </CardBody>
             </Card>
 
@@ -193,7 +214,9 @@ export default function ResidentDashboard() {
                 <h2 className="font-semibold text-slate-900">Recent payments</h2>
               </CardHeader>
               <CardBody className="space-y-3">
-                {data?.recentPayments?.length ? (
+                {loading ? (
+                  <p className="text-sm text-slate-500">Loading payments...</p>
+                ) : data.recentPayments.length ? (
                   data.recentPayments.map((payment) => (
                     <div key={payment.id} className="flex items-center justify-between text-sm">
                       <span>{payment.description || payment.type}</span>
